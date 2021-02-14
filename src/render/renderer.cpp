@@ -7,7 +7,7 @@
 Renderer Renderer::create(const platform::Window *window)
 {
     Renderer renderer = {
-        .context = gfx::Context::create(true, window)
+        .context = gfx::Context::create(false, window)
     };
 
     auto &device = renderer.context.device;
@@ -27,36 +27,82 @@ Renderer Renderer::create(const platform::Window *window)
 
 void Renderer::destroy()
 {
-    context.device.wait_idle();
+    auto &device = context.device;
+
+    device.wait_idle();
+
+    for (auto &receipt : rendering_done)
+    {
+        device.destroy_receipt(receipt);
+    }
+
+    for (auto &receipt : image_acquired)
+    {
+        device.destroy_receipt(receipt);
+    }
 
     for (auto &work_pool : work_pools)
     {
-        context.device.destroy_work_pool(work_pool);
+        device.destroy_work_pool(work_pool);
     }
 
     context.destroy();
+}
+
+void Renderer::on_resize()
+{
+    gfx::Device  &device  = context.device;
+    gfx::Surface &surface = *context.surface;
+
+    device.wait_idle();
+    surface.destroy_swapchain(device);
+    surface.create_swapchain(device);
+
+
+    for (auto &receipt : rendering_done)
+    {
+        device.destroy_receipt(receipt);
+        receipt = device.signaled_receipt();
+    }
+
+    for (auto &receipt : image_acquired)
+    {
+        device.destroy_receipt(receipt);
+        receipt = device.signaled_receipt();
+    }
 }
 
 void Renderer::update()
 {
     gfx::Device &device = context.device;
     auto current_frame = frame_count % FRAME_QUEUE_LENGTH;
-    auto &image_acquired = this->image_acquired[current_frame];
-    auto &rendering_done = this->rendering_done[current_frame];
-    auto &work_pool = work_pools[current_frame];
 
-    // wait for fence
+    // wait for fence, blocking
+    auto &rendering_done = this->rendering_done[current_frame];
     device.wait_for(rendering_done);
+
+    // reset the command buffers
+    auto &work_pool = work_pools[current_frame];
     device.reset_work_pool(work_pool);
 
     // receipt contains the image acquired semaphore
-    image_acquired = device.acquire_next_swapchain(*context.surface, &image_acquired);
+    auto &image_acquired = this->image_acquired[current_frame];
+    bool out_of_date_swapchain = false;
+    std::tie(image_acquired, out_of_date_swapchain) = device.acquire_next_swapchain(*context.surface, &image_acquired);
+    if (out_of_date_swapchain)
+    {
+        on_resize();
+        return;
+    }
 
-    // creating a work with a receipt means wait for this semaphore when submitting!
     gfx::GraphicsWork cmd = device.get_graphics_work(work_pool);
+
+    // wait_for previous work to complete, NOT BLOCKING!
+    // previous wait_for was waiting because we are waiting on the device,
+    // here the wait_for is in a command buffer, so on the gpu
     cmd.wait_for(image_acquired);
 
-    // do stuff
+    // do random stuff
     {
         cmd.begin();
 
@@ -96,6 +142,12 @@ void Renderer::update()
     rendering_done = device.submit(cmd, &rendering_done);
 
     // present will wait for semaphore
-    device.present(rendering_done, *context.surface, device.graphics_family_idx);
+    out_of_date_swapchain = device.present(rendering_done, *context.surface, gfx::WorkPool::POOL_TYPE_GRAPHICS);
+    if (out_of_date_swapchain)
+    {
+        on_resize();
+        return;
+    }
+
     frame_count += 1;
 }

@@ -79,6 +79,15 @@ static Work create_work(Device &device, WorkPool &work_pool, WorkPool::POOL_TYPE
     ai.commandBufferCount          = 1;
     VK_CHECK(vkAllocateCommandBuffers(device.device, &ai, &work.command_buffer));
 
+    u32 queue_family_idx =
+          pool_type == WorkPool::POOL_TYPE_GRAPHICS ? device.graphics_family_idx
+        : pool_type == WorkPool::POOL_TYPE_COMPUTE  ? device.compute_family_idx
+        : pool_type == WorkPool::POOL_TYPE_TRANSFER ? device.transfer_family_idx
+        : u32_invalid;
+
+    assert(queue_family_idx != u32_invalid);
+    vkGetDeviceQueue(device.device, queue_family_idx, 0, &work.queue);
+
     command_pool.free_list.push_back(work.command_buffer);
 
     return work;
@@ -99,7 +108,6 @@ TransferWork Device::get_transfer_work(WorkPool &work_pool)
     return {{create_work(*this, work_pool, WorkPool::POOL_TYPE_TRANSFER)}};
 }
 
-
 // Receipt
 Receipt Device::signaled_receipt()
 {
@@ -110,8 +118,16 @@ Receipt Device::signaled_receipt()
     return receipt;
 }
 
+void Device::destroy_receipt(Receipt &receipt)
+{
+    vkDestroyFence(device, receipt.fence, nullptr);
+    vkDestroySemaphore(device, receipt.semaphore, nullptr);
+    receipt.fence = VK_NULL_HANDLE;
+    receipt.semaphore = VK_NULL_HANDLE;
+}
+
 // Submission
-Receipt Device::submit(const Work &work, u32 queue_family_idx, Receipt *reuse_receipt)
+Receipt Device::submit(Work &work, Receipt *reuse_receipt)
 {
     // Create the receipt
     Receipt receipt = {};
@@ -134,7 +150,7 @@ Receipt Device::submit(const Work &work, u32 queue_family_idx, Receipt *reuse_re
 
     // Creathe list of semaphores to wait
     Vec<VkSemaphore> wait_list;
-    wait_list.reserve(work.wait_list.size());
+    wait_list.reserve(wait_list.size());
     for (const auto &wait : work.wait_list)
     {
         if (wait.semaphore != VK_NULL_HANDLE)
@@ -153,12 +169,43 @@ Receipt Device::submit(const Work &work, u32 queue_family_idx, Receipt *reuse_re
     submit_info.signalSemaphoreCount    = 1;
     submit_info.pSignalSemaphores       = &receipt.semaphore;
 
-    VkQueue queue = VK_NULL_HANDLE;
-    vkGetDeviceQueue(device, queue_family_idx, 0, &queue);
-
-    VK_CHECK(vkQueueSubmit(queue, 1, &submit_info, receipt.fence));
+    VK_CHECK(vkQueueSubmit(work.queue, 1, &submit_info, receipt.fence));
 
     return receipt;
+}
+
+bool Device::present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool_type)
+{
+    u32 queue_family_idx =
+          pool_type == WorkPool::POOL_TYPE_GRAPHICS ? this->graphics_family_idx
+        : pool_type == WorkPool::POOL_TYPE_COMPUTE  ? this->compute_family_idx
+        : pool_type == WorkPool::POOL_TYPE_TRANSFER ? this->transfer_family_idx
+        : u32_invalid;
+
+    assert(queue_family_idx != u32_invalid);
+
+    VkPresentInfoKHR present_i   = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+    present_i.waitSemaphoreCount = 1;
+    present_i.pWaitSemaphores    = &receipt.semaphore;
+    present_i.swapchainCount     = 1;
+    present_i.pSwapchains        = &surface.swapchain;
+    present_i.pImageIndices      = &surface.current_image;
+
+    VkQueue queue = VK_NULL_HANDLE;
+    vkGetDeviceQueue(this->device, queue_family_idx, 0, &queue);
+
+    auto res = vkQueuePresentKHR(queue, &present_i);
+
+    if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        return true;
+    }
+    else
+    {
+        VK_CHECK(res);
+    }
+
+    return false;
 }
 
 void Device::wait_for(Receipt &receipt)
@@ -183,8 +230,10 @@ void Device::wait_idle()
     VK_CHECK(vkDeviceWaitIdle(device));
 }
 
-Receipt Device::acquire_next_swapchain(Surface &surface, Receipt *reuse_receipt)
+std::pair<Receipt, bool> Device::acquire_next_swapchain(Surface &surface, Receipt *reuse_receipt)
 {
+    bool error = false;
+
     Receipt receipt = {};
     if (reuse_receipt)
     {
@@ -204,30 +253,15 @@ Receipt Device::acquire_next_swapchain(Surface &surface, Receipt *reuse_receipt)
         nullptr,
         &surface.current_image);
 
-    if (res != VK_SUBOPTIMAL_KHR)
+    if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        error = true;
+    }
+    else
     {
         VK_CHECK(res);
     }
 
-    return receipt;
-}
-
-void Device::present(Receipt receipt, Surface &surface, u32 queue_family_idx)
-{
-    VkPresentInfoKHR present_i   = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
-    present_i.waitSemaphoreCount = 1;
-    present_i.pWaitSemaphores    = &receipt.semaphore;
-    present_i.swapchainCount     = 1;
-    present_i.pSwapchains        = &surface.swapchain;
-    present_i.pImageIndices      = &surface.current_image;
-
-    VkQueue queue = VK_NULL_HANDLE;
-    vkGetDeviceQueue(device, queue_family_idx, 0, &queue);
-
-    auto res = vkQueuePresentKHR(queue, &present_i);
-    if (res != VK_SUBOPTIMAL_KHR && res != VK_ERROR_OUT_OF_DATE_KHR)
-    {
-        VK_CHECK(res);
-    }
+    return {receipt, error};
 }
 }

@@ -75,6 +75,8 @@ device.present(done);
 
 last_frame_done = done;
 **/
+struct Device;
+struct Surface;
 
 // A request to send a resource to another queue
 struct ResourceTransfer
@@ -96,6 +98,7 @@ struct Work
 {
     VkCommandBuffer command_buffer;
     Vec<Receipt> wait_list;
+    VkQueue queue;
 
     void begin();
     void end();
