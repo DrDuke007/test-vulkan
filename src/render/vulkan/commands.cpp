@@ -86,17 +86,17 @@ static Work create_work(Device &device, WorkPool &work_pool, WorkPool::POOL_TYPE
 
 GraphicsWork Device::get_graphics_work(WorkPool &work_pool)
 {
-    return {.work = create_work(*this, work_pool, WorkPool::POOL_TYPE_GRAPHICS)};
+    return {{{{create_work(*this, work_pool, WorkPool::POOL_TYPE_GRAPHICS)}}}};
 }
 
 ComputeWork Device::get_compute_work(WorkPool &work_pool)
 {
-    return {.work = create_work(*this, work_pool, WorkPool::POOL_TYPE_COMPUTE)};
+    return {{{create_work(*this, work_pool, WorkPool::POOL_TYPE_COMPUTE)}}};
 }
 
 TransferWork Device::get_transfer_work(WorkPool &work_pool)
 {
-    return {.work = create_work(*this, work_pool, WorkPool::POOL_TYPE_TRANSFER)};
+    return {{create_work(*this, work_pool, WorkPool::POOL_TYPE_TRANSFER)}};
 }
 
 

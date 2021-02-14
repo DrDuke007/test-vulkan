@@ -105,55 +105,23 @@ struct Work
     void wait_for(Receipt previous_work);
 };
 
-#define WORK_STATIC_DISPATCH                                                   \
-  inline void begin() { work.begin(); }                                        \
-  inline void end() { work.end(); }                                            \
-  inline ResourceTransfer send_to(int receiver, int resource) {                \
-    return work.send_to(receiver, resource);                                   \
-  }                                                                            \
-  inline void receive(ResourceTransfer transfer) { work.receive(transfer); }   \
-  inline void wait_for(Receipt previous_work) { work.wait_for(previous_work); }
-
-struct TransferWork
+struct TransferWork : Work
 {
-    Work work;
-
     void upload();
     void transfer();
-
-    WORK_STATIC_DISPATCH
 };
 
-#define TRANSFER_STATIC_DISPATCH                                               \
-  inline void upload() { work.upload(); }                                      \
-  inline void transfer() { work.transfer(); }
-
-struct ComputeWork
+struct ComputeWork : TransferWork
 {
-    TransferWork work;
-
     void dispatch();
     void bind_pipeline();
-
-    WORK_STATIC_DISPATCH
-    TRANSFER_STATIC_DISPATCH
 };
 
-#define COMPUTE_STATIC_DISPATCH                                                \
-  inline void dispatch() { work.dispatch(); }                                  \
-  inline void bind_pipeline() { work.bind_pipeline(); }
-
-struct GraphicsWork
+struct GraphicsWork : ComputeWork
 {
-    ComputeWork work;
-
     void draw();
     void begin_pass();
     void end_pass();
-    // void bind_pipeline();
-
-    WORK_STATIC_DISPATCH
-    TRANSFER_STATIC_DISPATCH
-    COMPUTE_STATIC_DISPATCH
+    void bind_pipeline();
 };
 }

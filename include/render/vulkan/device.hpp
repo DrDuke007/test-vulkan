@@ -66,9 +66,9 @@ struct Device
 
     Receipt signaled_receipt();
     Receipt submit(const Work &work, u32 queue_family_idx, Receipt *reuse_receipt);
-    inline Receipt submit(const TransferWork &work, Receipt *reuse_receipt = nullptr) { return submit(work.work, transfer_family_idx, reuse_receipt); }
-    inline Receipt submit(const ComputeWork &work,  Receipt *reuse_receipt = nullptr) { return submit(work.work.work, compute_family_idx, reuse_receipt); }
-    inline Receipt submit(const GraphicsWork &work, Receipt *reuse_receipt = nullptr) { return submit(work.work.work.work, graphics_family_idx, reuse_receipt); }
+    inline Receipt submit(const TransferWork &work, Receipt *reuse_receipt = nullptr) { return submit(work, transfer_family_idx, reuse_receipt); }
+    inline Receipt submit(const ComputeWork &work,  Receipt *reuse_receipt = nullptr) { return submit(work, compute_family_idx,  reuse_receipt); }
+    inline Receipt submit(const GraphicsWork &work, Receipt *reuse_receipt = nullptr) { return submit(work, graphics_family_idx, reuse_receipt); }
 
     void wait_for(Receipt &receipt);
     void wait_idle();
