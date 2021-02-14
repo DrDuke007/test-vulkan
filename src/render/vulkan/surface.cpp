@@ -23,7 +23,7 @@ Surface Surface::create(const Context &context, const platform::Window &window)
     VkXcbSurfaceCreateInfoKHR sci = {.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR};
     sci.connection                = window.xcb.connection;
     sci.window                    = window.xcb.window;
-    VK_CHECK(vkCreateXcbSurfaceKHR(context.instance, &sci, nullptr, &surface->surface));
+    VK_CHECK(vkCreateXcbSurfaceKHR(context.instance, &sci, nullptr, &surface.surface));
 #endif
 
     return surface;

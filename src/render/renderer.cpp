@@ -4,6 +4,8 @@
 #include "render/vulkan/device.hpp"
 #include "render/vulkan/utils.hpp"
 
+#include <tuple> // for std::tie
+
 Renderer Renderer::create(const platform::Window *window)
 {
     Renderer renderer = {

@@ -91,7 +91,9 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
         || device.compute_family_idx == u32_invalid
         || device.transfer_family_idx == u32_invalid)
     {
-        throw std::runtime_error("Failed to find a graphics, compute and transfer queue.");
+        auto style = fg(fmt::color::crimson) | fmt::emphasis::bold;
+        fmt::print(stderr, style, "Failed to find a graphics, compute and transfer queue.\n");
+        // throw std::runtime_error("Failed to find a graphics, compute and transfer queue.");
     }
 
     VkDeviceCreateInfo dci      = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
