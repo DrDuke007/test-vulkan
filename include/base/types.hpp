@@ -14,6 +14,7 @@
     }
 
 #define PACKED
+#define UNUSED(x) (void)(x)
 
 
 #if defined(__clang__)

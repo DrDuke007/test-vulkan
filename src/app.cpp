@@ -1,24 +1,17 @@
 #include "app.hpp"
-
-#include <fmt/core.h>
-#include <imgui/imgui.h>
 #include <variant>
-
-constexpr auto DEFAULT_WIDTH  = 1920;
-constexpr auto DEFAULT_HEIGHT = 1080;
 
 App::App()
 {
-    platform::Window::create(window, DEFAULT_WIDTH, DEFAULT_HEIGHT, "Multi viewport");
+    platform::Window::create(window, 1280, 720, "Multi viewport");
+    renderer = Renderer::create(&window);
 }
 
 App::~App()
 {
+    renderer.destroy();
 }
 
-void App::update()
-{
-}
 
 void App::run()
 {
@@ -62,6 +55,6 @@ void App::run()
             continue;
         }
 
-        update();
+        renderer.update();
     }
 }

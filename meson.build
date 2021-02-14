@@ -85,6 +85,11 @@ main_src = [
   'src/app.cpp',
   'src/base/pool.cpp',
   'src/base/vectors.cpp',
+  'src/render/renderer.cpp',
+  'src/render/vulkan/context.cpp',
+  'src/render/vulkan/commands.cpp',
+  'src/render/vulkan/device.cpp',
+  'src/render/vulkan/surface.cpp',
   'src/main.cpp',
 ]
 
