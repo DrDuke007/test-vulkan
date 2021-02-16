@@ -2,10 +2,13 @@
 #include "base/types.hpp"
 #include "base/option.hpp"
 #include "base/vector.hpp"
+#include "base/pool.hpp"
 #include "render/vulkan/commands.hpp"
+#include "render/vulkan/resources.hpp"
 
 #include <array>
 #include <utility>
+#include <string_view>
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 
@@ -48,6 +51,11 @@ struct Device
     u32 transfer_family_idx = u32_invalid;
     VmaAllocator allocator;
 
+    DescriptorSet global_set;
+
+    Pool<Shader> shaders;
+    Pool<GraphicsProgram> graphics_programs;
+
     /// ---
 
     static Device create(const Context &context, VkPhysicalDevice physical_device);
@@ -59,6 +67,15 @@ struct Device
     void reset_work_pool(WorkPool &work_pool);
     void destroy_work_pool(WorkPool &work_pool);
     void destroy_receipt(Receipt &receipt);
+
+    Handle<Shader> create_shader(std::string_view path);
+    void destroy_shader(Handle<Shader> shader_handle);
+
+    Handle<GraphicsProgram> create_program(const GraphicsState &graphics_state);
+    void destroy_program(Handle<GraphicsProgram> program_handle);
+
+    // Programs
+    unsigned compile(Handle<GraphicsProgram> &program_handle, const RenderState &render_state);
 
     // Command submission
     GraphicsWork get_graphics_work(WorkPool &work_pool);
@@ -73,4 +90,6 @@ struct Device
     std::pair<Receipt, bool> acquire_next_swapchain(Surface &surface, Receipt *reuse_receipt = nullptr);
     bool present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool_type);
 };
+
+DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphics_state);
 }

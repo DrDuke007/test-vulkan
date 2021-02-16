@@ -2,14 +2,16 @@
 
 #include "render/vulkan/commands.hpp"
 #include "render/vulkan/device.hpp"
+#include "render/vulkan/resources.hpp"
 #include "render/vulkan/utils.hpp"
+#include "vulkan/vulkan_core.h"
 
 #include <tuple> // for std::tie
 
 Renderer Renderer::create(const platform::Window *window)
 {
     Renderer renderer = {
-        .context = gfx::Context::create(false, window)
+        .context = gfx::Context::create(true, window)
     };
 
     auto &device = renderer.context.device;
@@ -23,6 +25,23 @@ Renderer Renderer::create(const platform::Window *window)
     {
         receipt = device.signaled_receipt();
     }
+
+    gfx::GraphicsState gui_state = {};
+    gui_state.vertex_shader   =  device.create_shader("shaders/gui.vert.spv");
+    gui_state.fragment_shader =  device.create_shader("shaders/gui.frag.spv");
+    gui_state.attachments.colors.push_back({.format = VK_FORMAT_R8G8B8A8_UNORM});
+    gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
+    gui_state.descriptors = {
+        {.type = gfx::DescriptorType::StorageBuffer},
+        {.type = gfx::DescriptorType::StorageBuffer},
+        {.type = gfx::DescriptorType::SampledImage},
+    };
+
+    Handle<gfx::GraphicsProgram> gui_program = device.create_program(gui_state);
+
+    gfx::RenderState state = {};
+    uint gui_default = device.compile(gui_program, state);
+    UNUSED(gui_default);
 
     return renderer;
 }

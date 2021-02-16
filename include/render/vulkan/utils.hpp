@@ -1,8 +1,9 @@
 #pragma once
 #include "base/types.hpp"
 #include "base/vector.hpp"
+#include "render/vulkan/resources.hpp"
+#include "vulkan/vulkan_core.h"
 
-#include <vulkan/vulkan.h>
 #include <stdexcept>
 #include <fmt/core.h>
 
@@ -79,33 +80,6 @@ inline bool is_extension_installed(const char *wanted, const Vec<VkExtensionProp
     }
     return false;
 }
-
-inline constexpr VkImageUsageFlags depth_attachment_usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-inline constexpr VkImageUsageFlags color_attachment_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-inline constexpr VkImageUsageFlags sampled_image_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-inline constexpr VkImageUsageFlags storage_image_usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-struct ImageAccess
-{
-    VkPipelineStageFlags stage = 0;
-    VkAccessFlags access       = 0;
-    VkImageLayout layout       = VK_IMAGE_LAYOUT_UNDEFINED;
-    // queue?
-};
-
-enum struct ImageUsage
-{
-    None,
-    GraphicsShaderRead,
-    GraphicsShaderReadWrite,
-    ComputeShaderRead,
-    ComputeShaderReadWrite,
-    TransferDst,
-    TransferSrc,
-    ColorAttachment,
-    DepthAttachment,
-    Present
-};
 
 inline ImageAccess get_src_image_access(ImageUsage usage)
 {
@@ -288,5 +262,28 @@ inline VkImageMemoryBarrier get_image_barrier(VkImage image, const ImageAccess &
     b.image                = image;
     b.subresourceRange     = range;
     return b;
+}
+
+inline VkPrimitiveTopology to_vk(PrimitiveTopology topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopology::TriangleList: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case PrimitiveTopology::PointList: return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    }
+
+}
+
+
+static inline VkDescriptorType to_vk(DescriptorType type)
+{
+    switch(type.type)
+    {
+    case DescriptorType::SampledImage: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    case DescriptorType::StorageImage: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    case DescriptorType::StorageBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    case DescriptorType::DynamicBuffer: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+    }
+    return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 }
 }

@@ -1,24 +1,37 @@
-layout(push_constant) uniform u_PushConstant {
-    vec2 Scale;
-    vec2 Translation;
-} u_Parameters;
+#extension GL_ARB_shader_draw_parameters : require
 
-layout(location = 0) in vec2 i_Position;
-layout(location = 1) in vec2 i_Texcoord;
-layout(location = 2) in vec4 i_Color;
+#include "types.h"
 
-out gl_PerVertex
+struct ImGuiVertex
 {
-    vec4 gl_Position;
+    float2 position;
+    float2 uv;
+    float4 color;
 };
 
-layout(location = 0) out vec2 v_Texcoord;
-layout(location = 1) out vec4 v_Color;
+struct DrawData
+{
+    float2 scale;
+    float2 translation;
+    uint vertex_offset;
+};
 
+layout(set = 0, binding = 0) buffer readonly Vertices {
+    ImGuiVertex vertices[];
+};
 
+layout(set = 0, binding = 1) buffer readonly DrawDatas {
+    DrawData draw_datas[];
+};
 
-void main() {
-    gl_Position = vec4( i_Position * u_Parameters.Scale + u_Parameters.Translation, 0.0, 1.0 );
-    v_Texcoord = i_Texcoord;
-    v_Color = i_Color;
+layout(location = 0) out float2 o_uv;
+layout(location = 1) out float4 o_color;
+void main()
+{
+    DrawData draw = draw_datas[gl_DrawIDARB];
+    ImGuiVertex vertex = vertices[gl_VertexIndex + draw.vertex_offset];
+
+    gl_Position = float4( vertex.position * draw.scale + draw.translation, 0.0, 1.0 );
+    o_uv = vertex.uv;
+    o_color = vertex.color;
 }

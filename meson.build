@@ -88,8 +88,11 @@ main_src = [
   'src/render/renderer.cpp',
   'src/render/vulkan/context.cpp',
   'src/render/vulkan/commands.cpp',
+  'src/render/vulkan/descriptor_set.cpp',
   'src/render/vulkan/device.cpp',
+  'src/render/vulkan/shader.cpp',
   'src/render/vulkan/surface.cpp',
+  'src/render/vulkan/graphics_pipeline.cpp',
   'src/main.cpp',
 ]
 

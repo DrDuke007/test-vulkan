@@ -51,12 +51,16 @@ struct int2
 {
     i32 x;
     i32 y;
+
+    bool operator==(const int2 &b) const = default;
 };
 
 struct uint2
 {
     u32 x;
     u32 y;
+
+    bool operator==(const uint2 &b) const = default;
 };
 
 struct uint3
@@ -64,6 +68,8 @@ struct uint3
     u32 x;
     u32 y;
     u32 z;
+
+    bool operator==(const uint3 &b) const = default;
 };
 
 inline int2 operator+(const int2 &a, const int2 &b) { return {a.x + b.x, a.y + b.y}; }
