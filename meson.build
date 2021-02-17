@@ -9,6 +9,17 @@ threads_dep = dependency('threads')
 
 # Compiler options
 cxx = meson.get_compiler('cpp')
+cpp_std = ''
+if cxx.get_id() == 'msvc'
+  cpp_std = 'c++latest'
+elif cxx.get_id() == 'clang'
+  cpp_std = 'c++2a'
+elif cxx.get_id() == 'gcc'
+  cpp_std = 'c++2a'
+else
+  error('Unsupported compiler: ' + cxx.get_id())
+endif
+
 ld_flags = []
 
 if cxx.get_id() == 'clang'
@@ -35,7 +46,8 @@ imgui_src = files([
   'third_party/imgui/imgui_tables.cpp',
   'third_party/imgui/imgui_widgets.cpp'
 ])
-imgui = library('imgui', imgui_src, include_directories: main_inc, cpp_args: ['-DIMGUI_USER_CONFIG="imgui_config.h"'], link_args: ld_flags)
+imgui = library('imgui', imgui_src, include_directories: main_inc, override_options : ['cpp_std=' + cpp_std], cpp_args: ['-DIMGUI_USER_CONFIG="imgui_config.h"'], link_args: ld_flags)
+
 
 # - simdjson
 simdjson = library('simdjson', 'third_party/simdjson/simdjson.cpp', link_args: ld_flags)
@@ -99,17 +111,9 @@ main_src = [
 main_ld_flags = []
 cpp_args = ['-DIMGUI_USER_CONFIG="imgui_config.h"']
 main_deps = [vulkan_dep, threads_dep, shaders_dep, fmt_dep]
-cpp_std = ''
 
-if cxx.get_id() == 'msvc'
-  cpp_std = 'c++latest'
-elif cxx.get_id() == 'clang'
-  cpp_std = 'c++2a'
-elif cxx.get_id() == 'gcc'
-  cpp_std = 'c++2a'
+if cxx.get_id() == 'gcc'
   cpp_args += '-Wno-missing-field-initializers'
-else
-  error('Unsupported compiler: ' + cxx.get_id())
 endif
 
 

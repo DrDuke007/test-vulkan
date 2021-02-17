@@ -271,7 +271,7 @@ inline VkPrimitiveTopology to_vk(PrimitiveTopology topology)
     case PrimitiveTopology::TriangleList: return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     case PrimitiveTopology::PointList: return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
     }
-
+    return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
 }
 
 
