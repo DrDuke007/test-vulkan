@@ -1,5 +1,6 @@
 #include "render/vulkan/device.hpp"
 #include "render/vulkan/utils.hpp"
+#include "vulkan/vulkan_core.h"
 
 #include <filesystem>
 #include <fstream>
@@ -54,6 +55,10 @@ Handle<Shader> Device::create_shader(std::string_view path)
 
 void Device::destroy_shader(Handle<Shader> shader_handle)
 {
-    shaders.remove(shader_handle);
+    if (auto *shader = shaders.get(shader_handle))
+    {
+        vkDestroyShaderModule(device, shader->vkhandle, nullptr);
+        shaders.remove(shader_handle);
+    }
 }
 };

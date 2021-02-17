@@ -1,3 +1,4 @@
+#include "render/vulkan/descriptor_set.hpp"
 #include "render/vulkan/resources.hpp"
 #include "render/vulkan/device.hpp"
 #include "render/vulkan/utils.hpp"
@@ -41,6 +42,8 @@ void Device::destroy_program(Handle<GraphicsProgram> program_handle)
 
         vkDestroyPipelineCache(device, program->cache, nullptr);
         vkDestroyPipelineLayout(device, program->pipeline_layout, nullptr);
+
+        destroy_descriptor_set(*this, program->descriptor_set);
 
         graphics_programs.remove(program_handle);
     }

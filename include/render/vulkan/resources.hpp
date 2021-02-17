@@ -5,6 +5,7 @@
 #include "base/vector.hpp"
 #include "base/option.hpp"
 #include "base/handle.hpp"
+#include "render/vulkan/descriptor_set.hpp"
 #include "render/vulkan/queues.hpp"
 #include "vulkan/vulkan_core.h"
 
@@ -142,58 +143,6 @@ struct RenderAttachments
 
     Vec<RenderAttachment> colors;
     Option<RenderAttachment> depth;
-};
-
-struct ImageDescriptor
-{
-    Handle<Image> image_handle;
-};
-
-struct BufferDescriptor
-{
-    Handle<Buffer> buffer_handle;
-};
-
-struct DynamicDescriptor
-{
-    Handle<Buffer> buffer_handle;
-    usize offset;
-};
-
-struct DescriptorType
-{
-    static const u32 SampledImage  = 0;
-    static const u32 StorageImage  = 1;
-    static const u32 StorageBuffer = 2;
-    static const u32 DynamicBuffer = 3;
-
-    union
-    {
-        struct
-        {
-            u32 count : 24;
-            u32 type : 8;
-        };
-        u32 raw;
-    };
-};
-
-struct Descriptor
-{
-    union
-    {
-        ImageDescriptor image;
-        BufferDescriptor buffer;
-        DynamicDescriptor dynamic;
-    };
-};
-
-struct DescriptorSet
-{
-    VkDescriptorSetLayout layout;
-    Vec<VkDescriptorSet> descriptor_set_pool;
-    Vec<uint> frame_used_pool;
-    Vec<Descriptor> descriptors;
 };
 
 // Everything needed to build a pipeline except render state which is a separate struct

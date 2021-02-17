@@ -130,6 +130,18 @@ void Device::destroy(const Context &context)
         return;
     }
 
+
+    for (auto [handle, _] : graphics_programs)
+    {
+        destroy_program(handle);
+    }
+
+    for (auto [handle, _] : shaders)
+    {
+        destroy_shader(handle);
+    }
+
+
     vkDestroyDevice(device, nullptr);
     vmaDestroyAllocator(allocator);
 }

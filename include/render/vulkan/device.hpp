@@ -5,6 +5,7 @@
 #include "base/pool.hpp"
 #include "render/vulkan/commands.hpp"
 #include "render/vulkan/resources.hpp"
+#include "render/vulkan/descriptor_set.hpp"
 
 #include <array>
 #include <utility>
@@ -91,5 +92,4 @@ struct Device
     bool present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool_type);
 };
 
-DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphics_state);
 }

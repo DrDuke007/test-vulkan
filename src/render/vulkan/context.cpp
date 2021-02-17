@@ -130,7 +130,7 @@ Context Context::create(bool enable_validation, const platform::Window *window)
         vkGetPhysicalDeviceProperties(physical_devices[i_device], &physical_props);
 
         fmt::print("Found device: {}\n", physical_props.deviceName);
-        if (physical_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        if (ctx.main_device == u32_invalid && physical_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         {
             fmt::print("Prioritizing device {} because it is a discrete GPU.\n", physical_props.deviceName);
             ctx.main_device = i_device;

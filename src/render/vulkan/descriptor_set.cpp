@@ -1,6 +1,8 @@
-#include "render/vulkan/resources.hpp"
+#include "render/vulkan/descriptor_set.hpp"
+
 #include "render/vulkan/device.hpp"
 #include "render/vulkan/utils.hpp"
+#include "vulkan/vulkan_core.h"
 
 namespace vulkan
 {
@@ -29,5 +31,10 @@ DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphic
     VK_CHECK(vkCreateDescriptorSetLayout(device.device, &desc_layout_info, nullptr, &descriptor_set.layout));
 
     return descriptor_set;
+}
+
+void destroy_descriptor_set(Device &device, DescriptorSet &set)
+{
+    vkDestroyDescriptorSetLayout(device.device, set.layout, nullptr);
 }
 };
