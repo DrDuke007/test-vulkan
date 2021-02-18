@@ -56,6 +56,7 @@ struct Device
 
     Pool<Shader> shaders;
     Pool<GraphicsProgram> graphics_programs;
+    Pool<RenderPass> renderpasses;
 
     /// ---
 
@@ -74,6 +75,10 @@ struct Device
 
     Handle<GraphicsProgram> create_program(const GraphicsState &graphics_state);
     void destroy_program(Handle<GraphicsProgram> program_handle);
+
+    Handle<RenderPass> create_renderpass(const RenderAttachments &render_attachments);
+    Handle<RenderPass> find_or_create_renderpass(const RenderAttachments &render_attachments);
+    void destroy_renderpass(Handle<RenderPass> renderpass_handle);
 
     // Programs
     unsigned compile(Handle<GraphicsProgram> &program_handle, const RenderState &render_state);

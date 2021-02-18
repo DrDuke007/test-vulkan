@@ -131,14 +131,19 @@ void Device::destroy(const Context &context)
     }
 
 
-    for (auto [handle, _] : graphics_programs)
+    for (auto &[handle, _] : graphics_programs)
     {
         destroy_program(handle);
     }
 
-    for (auto [handle, _] : shaders)
+    for (auto &[handle, _] : shaders)
     {
         destroy_shader(handle);
+    }
+
+    for (auto &[handle, _] : renderpasses)
+    {
+        destroy_renderpass(handle);
     }
 
 

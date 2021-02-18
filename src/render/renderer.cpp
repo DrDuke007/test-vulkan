@@ -30,7 +30,7 @@ Renderer Renderer::create(const platform::Window *window)
     gui_state.vertex_shader   =  device.create_shader("shaders/gui.vert.spv");
     gui_state.fragment_shader =  device.create_shader("shaders/gui.frag.spv");
     gui_state.attachments.colors.push_back({.format = VK_FORMAT_R8G8B8A8_UNORM});
-    gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
+    // gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
     gui_state.descriptors = {
         {.type = gfx::DescriptorType::StorageBuffer},
         {.type = gfx::DescriptorType::StorageBuffer},

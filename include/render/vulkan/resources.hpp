@@ -124,25 +124,22 @@ struct RenderAttachment
 {
     VkFormat format = VK_FORMAT_UNDEFINED;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+    VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE;
     bool operator==(const RenderAttachment &) const = default;
 };
 
 struct RenderAttachments
 {
-    /**
-       Framebuffers and graphics pipelines are created based on a specific render pass object.
-       They must only be used with that render pass object, or one compatible with it.
-       Two attachment references are compatible if they have matching format and sample count, or are
-       both VK_ATTACHMENT_UNUSED or the pointer that would contain the reference is NULL.
-       Two arrays of attachment references are compatible if all corresponding pairs of attachments are compatible.
-       If the arrays are of different lengths, attachment references not present in the smaller array are treated as VK_ATTACHMENT_UNUSED.
-
-       In other works, image layouts and store/load ops DO NOT matter.
-    **/
-
-
     Vec<RenderAttachment> colors;
     Option<RenderAttachment> depth;
+    bool operator==(const RenderAttachments &) const = default;
+};
+
+struct RenderPass
+{
+    VkRenderPass vkhandle;
+    RenderAttachments attachments;
 };
 
 // Everything needed to build a pipeline except render state which is a separate struct

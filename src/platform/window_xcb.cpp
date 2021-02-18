@@ -155,8 +155,10 @@ void Window::poll_events()
 
             case XCB_CONFIGURE_NOTIFY:
             {
+                #if 0
                 auto *configure_message = reinterpret_cast<xcb_configure_notify_event_t*>(ev);
                 fmt::print("Configure({}, {})\n", configure_message->width, configure_message->height);
+                #endif
                 // push_event<event::Resize>({.width = configure_message->width, .height = configure_message->height});
                 break;
             }

@@ -7,7 +7,6 @@
 namespace vulkan
 {
 
-
 Handle<GraphicsProgram> Device::create_program(const GraphicsState &graphics_state)
 {
     DescriptorSet set = create_descriptor_set(*this, graphics_state);
@@ -49,17 +48,16 @@ void Device::destroy_program(Handle<GraphicsProgram> program_handle)
     }
 }
 
-static VkRenderPass create_dumb_render_pass(Device &device, const RenderAttachments &attachments)
-{
-    VkRenderPass vk_renderpass = VK_NULL_HANDLE;
 
+Handle<RenderPass> Device::create_renderpass(const RenderAttachments &render_attachments)
+{
     Vec<VkAttachmentReference> color_refs;
-    color_refs.reserve(attachments.colors.size());
+    color_refs.reserve(render_attachments.colors.size());
 
     Vec<VkAttachmentDescription> attachment_descriptions;
-    attachment_descriptions.reserve(attachments.colors.size() + 1);
+    attachment_descriptions.reserve(render_attachments.colors.size() + 1);
 
-    for (const auto &color : attachments.colors)
+    for (const auto &color : render_attachments.colors)
     {
         color_refs.push_back({
                 .attachment = static_cast<u32>(attachment_descriptions.size()),
@@ -69,16 +67,10 @@ static VkRenderPass create_dumb_render_pass(Device &device, const RenderAttachme
         attachment_descriptions.push_back(VkAttachmentDescription{
                 .format = color.format,
                 .samples = color.samples,
+                .loadOp = color.load_op,
+                .storeOp = color.store_op,
                 .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                /**
-                .loadOp
-                .storeOp
-                .stencilLoadOp
-                .stencilStoreOp
-                .initialLayout
-                .finalLayout
-                 **/
             });
     }
 
@@ -87,23 +79,17 @@ static VkRenderPass create_dumb_render_pass(Device &device, const RenderAttachme
         .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
     };
 
-    if (attachments.depth)
+    if (render_attachments.depth)
     {
         depth_ref.attachment = static_cast<u32>(attachment_descriptions.size());
 
         attachment_descriptions.push_back(VkAttachmentDescription{
-                .format = attachments.depth->format,
-                .samples = attachments.depth->samples,
+                .format = render_attachments.depth->format,
+                .samples = render_attachments.depth->samples,
+                .loadOp = render_attachments.depth->load_op,
+                .storeOp = render_attachments.depth->store_op,
                 .initialLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
                 .finalLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                /**
-                .loadOp
-                .storeOp
-                .stencilLoadOp
-                .stencilStoreOp
-                .initialLayout
-                .finalLayout
-                 **/
             });
     }
 
@@ -115,7 +101,7 @@ static VkRenderPass create_dumb_render_pass(Device &device, const RenderAttachme
     subpass.colorAttachmentCount = color_refs.size();
     subpass.pColorAttachments    = color_refs.data();
     subpass.pResolveAttachments  = nullptr;
-    subpass.pDepthStencilAttachment = attachments.depth ? &depth_ref : nullptr;
+    subpass.pDepthStencilAttachment = render_attachments.depth ? &depth_ref : nullptr;
     subpass.preserveAttachmentCount = 0;
     subpass.pPreserveAttachments    = nullptr;
 
@@ -127,8 +113,36 @@ static VkRenderPass create_dumb_render_pass(Device &device, const RenderAttachme
     rp_info.dependencyCount        = 0;
     rp_info.pDependencies          = nullptr;
 
-    VK_CHECK(vkCreateRenderPass(device.device, &rp_info, nullptr, &vk_renderpass));
-    return vk_renderpass;
+
+    VkRenderPass vk_renderpass = VK_NULL_HANDLE;
+    VK_CHECK(vkCreateRenderPass(device, &rp_info, nullptr, &vk_renderpass));
+
+    return renderpasses.add({
+            .vkhandle = vk_renderpass,
+            .attachments = render_attachments,
+        });
+}
+
+Handle<RenderPass> Device::find_or_create_renderpass(const RenderAttachments &render_attachments)
+{
+    for (auto &[handle, renderpass] : renderpasses)
+    {
+        if (renderpass->attachments == render_attachments)
+        {
+            return handle;
+        }
+    }
+
+    return this->create_renderpass(render_attachments);
+}
+
+void Device::destroy_renderpass(Handle<RenderPass> renderpass_handle)
+{
+    if (auto *renderpass = renderpasses.get(renderpass_handle))
+    {
+        vkDestroyRenderPass(device, renderpass->vkhandle, nullptr);
+        renderpasses.remove(renderpass_handle);
+    }
 }
 
 unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderState &render_state)
@@ -137,21 +151,13 @@ unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderSt
     assert(p_program);
     auto &program = *p_program;
 
-    VkRenderPass render_pass = create_dumb_render_pass(*this, program.graphics_state.attachments);
-
     Vec<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 
     VkPipelineDynamicStateCreateInfo dyn_i = {.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
     dyn_i.dynamicStateCount                = dynamic_states.size();
     dyn_i.pDynamicStates                   = dynamic_states.data();
 
-    VkPipelineVertexInputStateCreateInfo vert_i = {
-        .sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount   = 0,
-        .pVertexBindingDescriptions      = nullptr,
-        .vertexAttributeDescriptionCount = 0,
-        .pVertexAttributeDescriptions    = nullptr,
-    };
+    VkPipelineVertexInputStateCreateInfo vert_i = { .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 
     VkPipelineInputAssemblyStateCreateInfo asm_i = {
         .sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -282,6 +288,9 @@ unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderSt
         shader_stages.push_back(create_info);
     }
 
+    Handle<RenderPass> renderpass_handle = this->find_or_create_renderpass(program.graphics_state.attachments);
+    const auto &renderpass = *this->renderpasses.get(renderpass_handle);
+
     VkGraphicsPipelineCreateInfo pipe_i = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
     pipe_i.layout                       = program.pipeline_layout;
     pipe_i.basePipelineHandle           = nullptr;
@@ -297,7 +306,7 @@ unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderSt
     pipe_i.pDepthStencilState           = &ds_i;
     pipe_i.pStages                      = shader_stages.data();
     pipe_i.stageCount                   = static_cast<u32>(shader_stages.size());
-    pipe_i.renderPass                   = render_pass;
+    pipe_i.renderPass                   = renderpass.vkhandle;
     pipe_i.subpass                      = 0;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
