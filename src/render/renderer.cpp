@@ -129,37 +129,12 @@ void Renderer::update()
 
     // do random stuff
     {
-        cmd.begin();
-
         auto swapchain_image = context.surface->images[context.surface->current_image];
 
-        VkImageSubresourceRange range = {};
-        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        range.baseMipLevel = 0;
-        range.levelCount = 1;
-        range.baseArrayLayer = 0;
-        range.layerCount = 1;
-
-        // Undefined -> TransferDst
-        {
-        auto none_access         = gfx::get_src_image_access(gfx::ImageUsage::None);
-        auto transfer_dst_access = gfx::get_dst_image_access(gfx::ImageUsage::TransferDst);
-        auto b1 = gfx::get_image_barrier(swapchain_image, none_access, transfer_dst_access, range);
-        vkCmdPipelineBarrier(cmd.command_buffer, none_access.stage, transfer_dst_access.stage, 0, 0, nullptr, 0, nullptr, 1, &b1);
-        }
-
-        // Clear image
-        VkClearColorValue clear_color = {.float32 = {1.0f, 0.0f, 0.0f, 1.0f}};
-        vkCmdClearColorImage(cmd.command_buffer, swapchain_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1, &range);
-
-        // TransferDst -> Present
-        {
-        auto transfer_dst_access = gfx::get_src_image_access(gfx::ImageUsage::TransferDst);
-        auto present_access         = gfx::get_dst_image_access(gfx::ImageUsage::Present);
-        auto b1 = gfx::get_image_barrier(swapchain_image, transfer_dst_access, present_access, range);
-        vkCmdPipelineBarrier(cmd.command_buffer, transfer_dst_access.stage, present_access.stage, 0, 0, nullptr, 0, nullptr, 1, &b1);
-        }
-
+        cmd.begin();
+        cmd.barrier(swapchain_image, gfx::ImageUsage::TransferDst);
+        cmd.clear_image(swapchain_image, {.float32 = {1.0f, 0.0f, 0.0f, 1.0f}});
+        cmd.barrier(swapchain_image, gfx::ImageUsage::Present);
         cmd.end();
     }
 

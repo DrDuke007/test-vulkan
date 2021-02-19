@@ -1,5 +1,6 @@
 #pragma once
 #include "base/types.hpp"
+#include <functional>
 
 /// --- Handle type (Typed index that can be invalid)
 template <typename T> struct Handle

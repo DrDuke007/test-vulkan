@@ -81,7 +81,7 @@ struct Device
     Handle<RenderPass> find_or_create_renderpass(const RenderAttachments &render_attachments);
     void destroy_renderpass(Handle<RenderPass> renderpass_handle);
 
-    Handle<Image> create_image(const ImageDescription &image_desc);
+    Handle<Image> create_image(const ImageDescription &image_desc, Option<VkImage> proxy = {});
     void destroy_image(Handle<Image> image_handle);
 
     // Programs

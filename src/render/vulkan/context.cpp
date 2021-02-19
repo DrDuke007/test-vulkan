@@ -1,5 +1,6 @@
 #include "render/vulkan/context.hpp"
 
+#include "render/vulkan/operators.hpp"
 #include "render/vulkan/utils.hpp"
 #include "render/vulkan/device.hpp"
 #include "render/vulkan/surface.hpp"
@@ -173,5 +174,87 @@ void Context::destroy()
     }
 
     vkDestroyInstance(instance, nullptr);
+}
+
+
+bool operator==(const VkPipelineShaderStageCreateInfo &a, const VkPipelineShaderStageCreateInfo &b)
+{
+    return a.flags == b.flags && a.stage == b.stage && a.module == b.module && a.pName == b.pName // TODO: strcmp?
+           && a.pSpecializationInfo == b.pSpecializationInfo;                                     // TODO: deep cmp?
+}
+
+bool operator==(const VkDescriptorBufferInfo &a, const VkDescriptorBufferInfo &b)
+{
+    return a.buffer == b.buffer && a.offset == b.offset && a.range == b.range;
+}
+
+bool operator==(const VkDescriptorImageInfo &a, const VkDescriptorImageInfo &b)
+{
+    return a.sampler == b.sampler && a.imageView == b.imageView && a.imageLayout == b.imageLayout;
+}
+
+bool operator==(const VkExtent3D &a, const VkExtent3D &b)
+{
+    return a.width == b.width && a.height == b.height && a.depth == b.depth;
+}
+
+bool operator==(const VkImageSubresourceRange &a, const VkImageSubresourceRange &b)
+{
+    return a.aspectMask == b.aspectMask && a.baseMipLevel == b.baseMipLevel && a.levelCount == b.levelCount
+           && a.baseArrayLayer == b.baseArrayLayer && a.layerCount == b.layerCount;
+}
+
+bool operator==(const VkImageCreateInfo &a, const VkImageCreateInfo &b)
+{
+    bool same = a.queueFamilyIndexCount == b.queueFamilyIndexCount;
+    if (!same)
+    {
+        return false;
+    }
+
+    if (a.pQueueFamilyIndices && b.pQueueFamilyIndices)
+    {
+        for (usize i = 0; i < a.queueFamilyIndexCount; i++)
+        {
+            if (a.pQueueFamilyIndices[i] != b.pQueueFamilyIndices[i])
+            {
+                return false;
+            }
+        }
+    }
+    else
+    {
+        same = a.pQueueFamilyIndices == b.pQueueFamilyIndices;
+    }
+
+    return same && a.flags == b.flags && a.imageType == b.imageType && a.format == b.format && a.extent == b.extent
+           && a.mipLevels == b.mipLevels && a.arrayLayers == b.arrayLayers && a.samples == b.samples
+           && a.tiling == b.tiling && a.usage == b.usage && a.sharingMode == b.sharingMode
+           && a.initialLayout == b.initialLayout;
+}
+
+bool operator==(const VkComputePipelineCreateInfo &a, const VkComputePipelineCreateInfo &b)
+{
+    return a.flags == b.flags && a.stage == b.stage && a.layout == b.layout
+           && a.basePipelineHandle == b.basePipelineHandle && a.basePipelineIndex == b.basePipelineIndex;
+}
+
+bool operator==(const VkFramebufferCreateInfo &a, const VkFramebufferCreateInfo &b)
+{
+    if (a.attachmentCount != b.attachmentCount)
+    {
+        return false;
+    }
+
+    for (uint i = 0; i < a.attachmentCount; i++)
+    {
+        if (a.pAttachments[i] != b.pAttachments[i])
+        {
+            return false;
+        }
+    }
+
+    return a.flags == b.flags && a.renderPass == b.renderPass && a.width == b.width && a.height == b.height
+           && a.layers == b.layers;
 }
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "base/types.hpp"
 #include "base/vector.hpp"
+#include "base/handle.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -10,6 +11,7 @@ namespace vulkan
 {
 struct Context;
 struct Device;
+struct Image;
 
 struct Surface
 {
@@ -20,11 +22,11 @@ struct Surface
     VkPresentModeKHR present_mode;
     VkExtent2D extent;
     u32 current_image = u32_invalid;
-    Vec<VkImage> images;
+    Vec<Handle<Image>> images;
 
-    static Surface create(const Context &context, const platform::Window &window);
-    void destroy(const Context &context);
-    void create_swapchain(const Device &device);
-    void destroy_swapchain(const Device &device);
+    static Surface create(Context &context, const platform::Window &window);
+    void destroy(Context &context);
+    void create_swapchain(Device &device);
+    void destroy_swapchain(Device &device);
 };
 }

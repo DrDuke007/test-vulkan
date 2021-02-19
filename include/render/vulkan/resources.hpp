@@ -5,6 +5,8 @@
 #include "base/vector.hpp"
 #include "base/option.hpp"
 #include "base/handle.hpp"
+
+#include "render/vulkan/operators.hpp"
 #include "render/vulkan/descriptor_set.hpp"
 #include "render/vulkan/queues.hpp"
 #include "vulkan/vulkan_core.h"
@@ -62,6 +64,7 @@ struct Image
     VmaAllocation allocation;
     ImageUsage usage = ImageUsage::None;
     bool is_proxy = false;
+    VkImageSubresourceRange full_range;
     bool operator==(const Image &b) const = default;
 };
 

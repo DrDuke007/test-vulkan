@@ -2,6 +2,7 @@
 
 #include "render/vulkan/context.hpp"
 #include "render/vulkan/device.hpp"
+#include "render/vulkan/resources.hpp"
 #include "render/vulkan/utils.hpp"
 #include "platform/window.hpp"
 #include "vulkan/vulkan_core.h"
@@ -9,7 +10,7 @@
 namespace vulkan
 {
 
-Surface Surface::create(const Context &context, const platform::Window &window)
+Surface Surface::create(Context &context, const platform::Window &window)
 {
     Surface surface = {};
 
@@ -29,13 +30,13 @@ Surface Surface::create(const Context &context, const platform::Window &window)
     return surface;
 }
 
-void Surface::destroy(const Context &context)
+void Surface::destroy(Context &context)
 {
     this->destroy_swapchain(context.device);
     vkDestroySurfaceKHR(context.instance, surface, nullptr);
 }
 
-void Surface::create_swapchain(const Device &device)
+void Surface::create_swapchain(Device &device)
 {
     // Use default extent for the swapchain
     VkSurfaceCapabilitiesKHR capabilities;
@@ -116,7 +117,7 @@ void Surface::create_swapchain(const Device &device)
     ci.imageColorSpace          = this->format.colorSpace;
     ci.imageExtent              = this->extent;
     ci.imageArrayLayers         = 1;
-    ci.imageUsage               = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    ci.imageUsage               = color_attachment_usage;
     ci.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
     ci.queueFamilyIndexCount = 0;
     ci.pQueueFamilyIndices   = nullptr;
@@ -128,18 +129,36 @@ void Surface::create_swapchain(const Device &device)
     VK_CHECK(vkCreateSwapchainKHR(device.device, &ci, nullptr, &this->swapchain));
 
 
-    // TODO: remove
     uint images_count = 0;
     VK_CHECK(vkGetSwapchainImagesKHR(device.device, this->swapchain, &images_count, nullptr));
-    this->images.resize(images_count);
+
+    Vec<VkImage> vkimages(images_count);
     VK_CHECK(vkGetSwapchainImagesKHR(device.device,
                                      this->swapchain,
                                      &images_count,
-                                     this->images.data()));
+                                     vkimages.data()));
+
+    this->images.resize(images_count);
+    for (uint i_image = 0; i_image < images_count; i_image++)
+    {
+        this->images[i_image] = device.create_image({
+                .name   = fmt::format("Swapchain #{}", i_image),
+                .size   = {extent.width, extent.height, 1},
+                .format = format.format,
+                .usages = color_attachment_usage,
+            },
+            vkimages[i_image]
+        );
+    }
 }
 
-void Surface::destroy_swapchain(const Device &device)
+void Surface::destroy_swapchain(Device &device)
 {
+    for (auto image : images)
+    {
+        device.destroy_image(image);
+    }
+
     vkDestroySwapchainKHR(device.device, this->swapchain, nullptr);
     this->swapchain = VK_NULL_HANDLE;
 }

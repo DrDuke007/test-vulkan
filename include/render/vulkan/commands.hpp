@@ -1,5 +1,7 @@
 #pragma once
+#include "base/handle.hpp"
 #include "base/vector.hpp"
+#include "render/vulkan/resources.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -76,6 +78,7 @@ device.present(done);
 last_frame_done = done;
 **/
 struct Device;
+struct Image;
 struct Surface;
 
 // A request to send a resource to another queue
@@ -96,6 +99,8 @@ struct Receipt
 // Command buffer / Queue abstraction
 struct Work
 {
+    Device *device;
+
     VkCommandBuffer command_buffer;
     Vec<Receipt> wait_list;
     VkQueue queue;
@@ -106,6 +111,8 @@ struct Work
     ResourceTransfer send_to(int receiver, int resource);
     void receive(ResourceTransfer transfer);
     void wait_for(Receipt previous_work);
+
+    void barrier(Handle<Image> image, ImageUsage usage_destination);
 };
 
 struct TransferWork : Work
@@ -116,6 +123,8 @@ struct TransferWork : Work
 
 struct ComputeWork : TransferWork
 {
+    void clear_image(Handle<Image> image, VkClearColorValue clear_color);
+
     void dispatch();
     void bind_pipeline();
 };

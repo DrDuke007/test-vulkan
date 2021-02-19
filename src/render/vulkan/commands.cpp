@@ -27,6 +27,27 @@ void Work::wait_for(Receipt previous_work)
     wait_list.push_back(previous_work);
 }
 
+void Work::barrier(Handle<Image> image_handle, ImageUsage usage_destination)
+{
+    auto image = *device->images.get(image_handle);
+
+    auto src_access = get_src_image_access(image.usage);
+    auto dst_access = get_dst_image_access(usage_destination);
+    auto b          = get_image_barrier(image.vkhandle, src_access, dst_access, image.full_range);
+    vkCmdPipelineBarrier(command_buffer, src_access.stage, dst_access.stage, 0, 0, nullptr, 0, nullptr, 1, &b);
+
+    image.usage = usage_destination;
+}
+
+/// --- ComputeWork
+
+void ComputeWork::clear_image(Handle<Image> image_handle, VkClearColorValue clear_color)
+{
+    auto image = *device->images.get(image_handle);
+
+    vkCmdClearColorImage(command_buffer, image.vkhandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1, &image.full_range);
+}
+
 /// --- Device
 
 // WorkPool
@@ -72,6 +93,7 @@ static Work create_work(Device &device, WorkPool &work_pool, WorkPool::POOL_TYPE
     auto &command_pool = work_pool.command_pools[pool_type];
 
     Work work = {};
+    work.device = &device;
 
     VkCommandBufferAllocateInfo ai = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     ai.commandPool                 = command_pool.vk_handle;
