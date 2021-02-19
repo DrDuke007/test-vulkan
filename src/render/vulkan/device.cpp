@@ -146,8 +146,12 @@ void Device::destroy(const Context &context)
         destroy_renderpass(handle);
     }
 
+    for (auto &[handle, _] : images)
+    {
+        destroy_image(handle);
+    }
 
-    vkDestroyDevice(device, nullptr);
     vmaDestroyAllocator(allocator);
+    vkDestroyDevice(device, nullptr);
 }
 }

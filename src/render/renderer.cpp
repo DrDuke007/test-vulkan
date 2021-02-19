@@ -37,11 +37,16 @@ Renderer Renderer::create(const platform::Window *window)
         {.type = gfx::DescriptorType::SampledImage},
     };
 
-    Handle<gfx::GraphicsProgram> gui_program = device.create_program(gui_state);
+    renderer.gui_program = device.create_program(gui_state);
 
     gfx::RenderState state = {};
-    uint gui_default = device.compile(gui_program, state);
+    uint gui_default = device.compile(renderer.gui_program, state);
     UNUSED(gui_default);
+
+    renderer.gui_font_atlas = device.create_image({
+            .name = "Font Atlas",
+            .size = {256, 256, 1},
+        });
 
     return renderer;
 }
@@ -78,7 +83,6 @@ void Renderer::on_resize()
     device.wait_idle();
     surface.destroy_swapchain(device);
     surface.create_swapchain(device);
-
 
     for (auto &receipt : rendering_done)
     {

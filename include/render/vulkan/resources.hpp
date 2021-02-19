@@ -58,7 +58,7 @@ struct ImageDescription
 struct Image
 {
     ImageDescription desc;
-    VkImage vk_handle;
+    VkImage vkhandle;
     VmaAllocation allocation;
     ImageUsage usage = ImageUsage::None;
     bool is_proxy = false;

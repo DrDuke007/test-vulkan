@@ -113,7 +113,6 @@ Handle<RenderPass> Device::create_renderpass(const RenderAttachments &render_att
     rp_info.dependencyCount        = 0;
     rp_info.pDependencies          = nullptr;
 
-
     VkRenderPass vk_renderpass = VK_NULL_HANDLE;
     VK_CHECK(vkCreateRenderPass(device, &rp_info, nullptr, &vk_renderpass));
 
