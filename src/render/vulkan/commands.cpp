@@ -1,4 +1,5 @@
 #include "render/vulkan/commands.hpp"
+#include "render/vulkan/descriptor_set.hpp"
 #include "render/vulkan/device.hpp"
 
 #include "render/vulkan/surface.hpp"
@@ -80,6 +81,21 @@ void GraphicsWork::begin_pass(Handle<RenderPass> renderpass_handle, Handle<Frame
 void GraphicsWork::end_pass()
 {
     vkCmdEndRenderPass(command_buffer);
+}
+
+void GraphicsWork::bind_pipeline(Handle<GraphicsProgram> program_handle, uint pipeline_index)
+{
+    auto &program = *device->graphics_programs.get(program_handle);
+    auto pipeline = program.pipelines[pipeline_index];
+
+    std::array sets {
+        find_or_create_descriptor_set(*device, program.descriptor_set)
+    };
+
+    Vec<u32> offsets = {};
+
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program.pipeline_layout, 0, sets.size(), sets.data(), offsets.size(), offsets.data());
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
 
 /// --- Device

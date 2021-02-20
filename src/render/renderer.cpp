@@ -34,9 +34,9 @@ Renderer Renderer::create(const platform::Window *window)
     gui_state.attachments.colors.push_back({.format = surface.format.format});
     // gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
     gui_state.descriptors = {
-        {.type = gfx::DescriptorType::StorageBuffer},
-        {.type = gfx::DescriptorType::StorageBuffer},
-        {.type = gfx::DescriptorType::SampledImage},
+        {.type = gfx::DescriptorType::StorageBuffer, .count = 1},
+        {.type = gfx::DescriptorType::StorageBuffer, .count = 1},
+        {.type = gfx::DescriptorType::SampledImage,  .count = 1},
     };
 
     renderer.gui_program = device.create_program(gui_state);
@@ -166,6 +166,7 @@ void Renderer::update()
         else
         {
             cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {1.0f, 0.0f, 0.0f, 1.0f}}}});
+            cmd.bind_pipeline(gui_program, 0);
             cmd.end_pass();
         }
 

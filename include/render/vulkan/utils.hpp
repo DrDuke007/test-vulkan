@@ -1,11 +1,12 @@
 #pragma once
 #include "base/types.hpp"
 #include "base/vector.hpp"
+#include "base/log.hpp"
+
 #include "render/vulkan/resources.hpp"
 #include "vulkan/vulkan_core.h"
 
 #include <stdexcept>
-#include <fmt/core.h>
 
 namespace vulkan
 {
@@ -64,7 +65,7 @@ inline const char *vkres_to_str(VkResult code)
         if (err)                                                                                                       \
         {                                                                                                              \
             const char *err_msg = vkres_to_str(err);                                                                   \
-            fmt::print(stderr, "Vulkan function returned {}\n", err_msg);                                              \
+            log::error("Vulkan function returned {}\n", err_msg);    \
             throw std::runtime_error(err_msg);                                                                         \
         }                                                                                                              \
     } while (0)

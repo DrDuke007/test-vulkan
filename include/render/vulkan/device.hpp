@@ -52,6 +52,7 @@ struct Device
     u32 transfer_family_idx = u32_invalid;
     VmaAllocator allocator;
 
+    VkDescriptorPool descriptor_pool;
     DescriptorSet global_set;
 
     Pool<Shader> shaders;

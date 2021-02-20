@@ -1,6 +1,6 @@
 #pragma once
 #include "base/types.hpp"
-#include <functional>
+#include "base/hash.hpp"
 
 /// --- Handle type (Typed index that can be invalid)
 template <typename T> struct Handle
@@ -64,9 +64,9 @@ namespace std
     {
         std::size_t operator()(Handle<T> const& handle) const noexcept
         {
-            std::size_t h1 = std::hash<u32>{}(handle.index);
-            std::size_t h2 = std::hash<u32>{}(handle.gen);
-            return h1 ^ (h2 << 1); // or use boost::hash_combine
+            usize hash = hash_value(handle.index);
+            hash_combine(hash, handle.gen);
+            return hash;
         }
     };
 }

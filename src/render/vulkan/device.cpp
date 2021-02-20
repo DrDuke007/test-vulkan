@@ -1,6 +1,8 @@
 #include "render/vulkan/device.hpp"
 
-#include "base/numerics.hpp"
+#include "base/types.hpp"
+#include "base/log.hpp"
+
 #include "render/vulkan/utils.hpp"
 #include "render/vulkan/context.hpp"
 #include "render/vulkan/surface.hpp"
@@ -8,8 +10,6 @@
 #include "vulkan/vulkan_core.h"
 
 #include <array>
-#include <fmt/core.h>
-#include <fmt/color.h>
 
 namespace vulkan
 {
@@ -91,8 +91,7 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
         || device.compute_family_idx == u32_invalid
         || device.transfer_family_idx == u32_invalid)
     {
-        auto style = fg(fmt::color::crimson) | fmt::emphasis::bold;
-        fmt::print(stderr, style, "Failed to find a graphics, compute and transfer queue.\n");
+        log::error("Failed to find a graphics, compute and transfer queue.\n");
         // throw std::runtime_error("Failed to find a graphics, compute and transfer queue.");
     }
 
@@ -117,6 +116,23 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
     allocator_info.instance               = context.instance;
     allocator_info.flags                  = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
     VK_CHECK(vmaCreateAllocator(&allocator_info, &device.allocator));
+
+    /// --- Descriptor sets pool
+
+    std::array pool_sizes{
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 16},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          .descriptorCount = 16},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, .descriptorCount = 16},
+        VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         .descriptorCount = 16},
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pool_info.flags                      = 0;
+    pool_info.poolSizeCount              = pool_sizes.size();
+    pool_info.pPoolSizes                 = pool_sizes.data();
+    pool_info.maxSets                    = 16;
+
+    VK_CHECK(vkCreateDescriptorPool(device.device, &pool_info, nullptr, &device.descriptor_pool));
 
     return device;
 }
@@ -154,6 +170,8 @@ void Device::destroy(const Context &context)
     {
         destroy_image(handle);
     }
+    vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
+
     vmaDestroyAllocator(allocator);
     vkDestroyDevice(device, nullptr);
 }

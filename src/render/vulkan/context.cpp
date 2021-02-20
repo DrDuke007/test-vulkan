@@ -6,8 +6,7 @@
 #include "render/vulkan/surface.hpp"
 #include "platform/window.hpp"
 
-#include <fmt/color.h>
-#include <fmt/core.h>
+#include "base/log.hpp"
 
 namespace vulkan
 {
@@ -16,16 +15,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
                                                      const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
                                                      void * /*unused*/)
 {
-    auto style = fg(fmt::color::crimson) | fmt::emphasis::bold;
-    fmt::print(stderr, style, "{}\n", pCallbackData->pMessage);
+    log::error("{}\n", pCallbackData->pMessage);
 
     if (pCallbackData->objectCount)
     {
-        fmt::print(stderr, style, "Objects:\n");
+        log::error("Objects:\n");
         for (size_t i = 0; i < pCallbackData->objectCount; i++)
         {
             const auto &object = pCallbackData->pObjects[i];
-            fmt::print(stderr, style, "\t [{}] {}\n", i, (object.pObjectName ? object.pObjectName : "NoName"));
+            log::error("\t [{}] {}\n", i, (object.pObjectName ? object.pObjectName : "NoName"));
         }
     }
 
@@ -130,10 +128,10 @@ Context Context::create(bool enable_validation, const platform::Window *window)
         VkPhysicalDeviceProperties physical_props;
         vkGetPhysicalDeviceProperties(physical_devices[i_device], &physical_props);
 
-        fmt::print("Found device: {}\n", physical_props.deviceName);
+        log::info("Found device: {}\n", physical_props.deviceName);
         if (ctx.main_device == u32_invalid && physical_props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         {
-            fmt::print("Prioritizing device {} because it is a discrete GPU.\n", physical_props.deviceName);
+            log::info("Prioritizing device {} because it is a discrete GPU.\n", physical_props.deviceName);
             ctx.main_device = i_device;
         }
     }
@@ -141,7 +139,7 @@ Context Context::create(bool enable_validation, const platform::Window *window)
     if (ctx.main_device == u32_invalid)
     {
         ctx.main_device = 0;
-        fmt::print("No discrete GPU found, defaulting to device #0.\n");
+        log::info("No discrete GPU found, defaulting to device #0.\n");
     }
 
     ctx.device = Device::create(ctx, physical_devices[ctx.main_device]);
