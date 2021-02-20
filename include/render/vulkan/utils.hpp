@@ -265,6 +265,164 @@ inline VkImageMemoryBarrier get_image_barrier(VkImage image, const ImageAccess &
     return b;
 }
 
+
+inline BufferAccess get_src_buffer_access(BufferUsage usage)
+{
+    BufferAccess access;
+    switch (usage)
+    {
+    case BufferUsage::GraphicsShaderRead:
+    {
+        access.stage  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+        access.access = 0;
+    }
+    break;
+    case BufferUsage::GraphicsShaderReadWrite:
+    {
+        access.stage  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        access.access = VK_ACCESS_SHADER_WRITE_BIT;
+    }
+    break;
+    case BufferUsage::ComputeShaderRead:
+    {
+        access.stage  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        access.access = 0;
+    }
+    break;
+    case BufferUsage::ComputeShaderReadWrite:
+    {
+        access.stage  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        access.access = VK_ACCESS_SHADER_WRITE_BIT;
+    }
+    break;
+    case BufferUsage::TransferDst:
+    {
+        access.stage  = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        access.access = VK_ACCESS_TRANSFER_WRITE_BIT;
+    }
+    break;
+    case BufferUsage::TransferSrc:
+    {
+        access.stage  = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        access.access = 0;
+    }
+    break;
+    case BufferUsage::IndexBuffer:
+    {
+        access.stage  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+        access.access = VK_ACCESS_INDEX_READ_BIT;
+    }
+    break;
+    case BufferUsage::VertexBuffer:
+    {
+        access.stage  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+        access.access = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    }
+    break;
+    case BufferUsage::DrawCommands:
+    {
+        access.stage  = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+        access.access = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+    }
+    break;
+    case BufferUsage::None:
+    {
+        access.stage  = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        access.access = 0;
+    }
+    break;
+    default:
+        assert(false);
+        break;
+    };
+    return access;
+}
+
+inline BufferAccess get_dst_buffer_access(BufferUsage usage)
+{
+    BufferAccess access;
+    switch (usage)
+    {
+    case BufferUsage::GraphicsShaderRead:
+    {
+        access.stage  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        access.access = VK_ACCESS_SHADER_READ_BIT;
+    }
+    break;
+    case BufferUsage::GraphicsShaderReadWrite:
+    {
+        access.stage  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        access.access = VK_ACCESS_SHADER_WRITE_BIT;
+    }
+    break;
+    case BufferUsage::ComputeShaderRead:
+    {
+        access.stage  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        access.access = VK_ACCESS_SHADER_READ_BIT;
+    }
+    break;
+    case BufferUsage::ComputeShaderReadWrite:
+    {
+        access.stage  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        access.access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    }
+    break;
+    case BufferUsage::TransferDst:
+    {
+        access.stage  = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        access.access = VK_ACCESS_TRANSFER_WRITE_BIT;
+    }
+    break;
+    case BufferUsage::TransferSrc:
+    {
+        access.stage  = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        access.access = VK_ACCESS_TRANSFER_READ_BIT;
+    }
+    break;
+    case BufferUsage::IndexBuffer:
+    {
+        access.stage  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+        access.access = VK_ACCESS_INDEX_READ_BIT;
+    }
+    break;
+    case BufferUsage::VertexBuffer:
+    {
+        access.stage  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+        access.access = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    }
+    break;
+    case BufferUsage::DrawCommands:
+    {
+        access.stage  = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+        access.access = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+    }
+    break;
+    case BufferUsage::None:
+    {
+        access.stage  = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        access.access = 0;
+    }
+    break;
+    default:
+        assert(false);
+        break;
+    };
+    return access;
+}
+
+inline VkBufferMemoryBarrier get_buffer_barrier(VkBuffer buffer, const BufferAccess &src, const BufferAccess &dst, usize offset, usize size)
+{
+    VkBufferMemoryBarrier b = {.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+    b.srcAccessMask         = src.access;
+    b.dstAccessMask         = dst.access;
+    b.srcQueueFamilyIndex   = VK_QUEUE_FAMILY_IGNORED;
+    b.dstQueueFamilyIndex   = VK_QUEUE_FAMILY_IGNORED;
+    b.buffer                = buffer;
+    b.offset                = offset;
+    b.size                  = size;
+    return b;
+}
+
 inline VkPrimitiveTopology to_vk(PrimitiveTopology topology)
 {
     switch (topology)

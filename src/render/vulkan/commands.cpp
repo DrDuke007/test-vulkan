@@ -23,14 +23,15 @@ void Work::end()
     VK_CHECK(vkEndCommandBuffer(command_buffer));
 }
 
-void Work::wait_for(Receipt previous_work)
+void Work::wait_for(Receipt previous_work, VkPipelineStageFlags stage_dst)
 {
     wait_list.push_back(previous_work);
+    wait_stage_list.push_back(stage_dst);
 }
 
 void Work::barrier(Handle<Image> image_handle, ImageUsage usage_destination)
 {
-    auto image = *device->images.get(image_handle);
+    auto &image = *device->images.get(image_handle);
 
     auto src_access = get_src_image_access(image.usage);
     auto dst_access = get_dst_image_access(usage_destination);
@@ -38,6 +39,58 @@ void Work::barrier(Handle<Image> image_handle, ImageUsage usage_destination)
     vkCmdPipelineBarrier(command_buffer, src_access.stage, dst_access.stage, 0, 0, nullptr, 0, nullptr, 1, &b);
 
     image.usage = usage_destination;
+}
+
+
+void Work::barriers(Vec<std::pair<Handle<Image>, ImageUsage>> images, Vec<std::pair<Handle<Buffer>, BufferUsage>> buffers)
+{
+    Vec<VkImageMemoryBarrier> image_barriers;
+    Vec<VkBufferMemoryBarrier> buffer_barriers;
+
+    VkPipelineStageFlags src_stage = 0;
+    VkPipelineStageFlags dst_stage = 0;
+
+    for (auto &[image_handle, usage_dst] : images)
+    {
+        auto &image = *device->images.get(image_handle);
+        auto src_access = get_src_image_access(image.usage);
+        auto dst_access = get_dst_image_access(usage_dst);
+        image_barriers.push_back(get_image_barrier(image.vkhandle, src_access, dst_access, image.full_range));
+        src_stage |= src_access.stage;
+        dst_stage |= dst_access.stage;
+
+        image.usage = usage_dst;
+    }
+
+    for (auto &[buffer_handle, usage_dst] : buffers)
+    {
+        auto &buffer = *device->buffers.get(buffer_handle);
+        auto src_access = get_src_buffer_access(buffer.usage);
+        auto dst_access = get_dst_buffer_access(usage_dst);
+        buffer_barriers.push_back(get_buffer_barrier(buffer.vkhandle, src_access, dst_access, 0, buffer.desc.size));
+        src_stage |= src_access.stage;
+        dst_stage |= dst_access.stage;
+
+        buffer.usage = usage_dst;
+    }
+
+    vkCmdPipelineBarrier(command_buffer, src_stage, dst_stage, 0, 0, nullptr, buffer_barriers.size(), buffer_barriers.data(), image_barriers.size(), image_barriers.data());
+}
+
+/// --- TransferWork
+
+void TransferWork::copy_buffer(Handle<Buffer> src, Handle<Buffer> dst)
+{
+    auto &src_buffer = *device->buffers.get(src);
+    auto &dst_buffer = *device->buffers.get(dst);
+
+    VkBufferCopy copy = {
+        .srcOffset = 0,
+        .dstOffset = 0,
+        .size      = std::min(src_buffer.desc.size, dst_buffer.desc.size),
+    };
+
+    vkCmdCopyBuffer(command_buffer, src_buffer.vkhandle, dst_buffer.vkhandle, 1, &copy);
 }
 
 /// --- ComputeWork
@@ -231,11 +284,13 @@ Receipt Device::submit(Work &work, Receipt *reuse_receipt)
         }
     }
 
-    VkPipelineStageFlags stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //TODO: check if needed
+    vkResetFences(device, 1, &receipt.fence);
+
     VkSubmitInfo submit_info            = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
     submit_info.waitSemaphoreCount      = wait_list.size();
     submit_info.pWaitSemaphores         = wait_list.data();
-    submit_info.pWaitDstStageMask       = &stage;
+    submit_info.pWaitDstStageMask       = work.wait_stage_list.data();
     submit_info.commandBufferCount      = 1;
     submit_info.pCommandBuffers         = &work.command_buffer;
     submit_info.signalSemaphoreCount    = 1;

@@ -2,6 +2,7 @@
 #include "base/handle.hpp"
 #include "base/vector.hpp"
 #include "render/vulkan/resources.hpp"
+#include "vulkan/vulkan_core.h"
 
 #include <vulkan/vulkan.h>
 
@@ -103,6 +104,7 @@ struct Work
 
     VkCommandBuffer command_buffer;
     Vec<Receipt> wait_list;
+    Vec<VkPipelineStageFlags> wait_stage_list;
     VkQueue queue;
 
     void begin();
@@ -110,14 +112,15 @@ struct Work
 
     ResourceTransfer send_to(int receiver, int resource);
     void receive(ResourceTransfer transfer);
-    void wait_for(Receipt previous_work);
+    void wait_for(Receipt previous_work, VkPipelineStageFlags stage_dst);
 
     void barrier(Handle<Image> image, ImageUsage usage_destination);
+    void barriers(Vec<std::pair<Handle<Image>, ImageUsage>> images, Vec<std::pair<Handle<Buffer>, BufferUsage>> buffers);
 };
 
 struct TransferWork : Work
 {
-    void upload();
+    void copy_buffer(Handle<Buffer> src, Handle<Buffer> dst);
     void transfer();
 };
 

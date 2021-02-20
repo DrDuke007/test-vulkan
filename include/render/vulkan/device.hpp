@@ -60,6 +60,7 @@ struct Device
     Pool<RenderPass> renderpasses;
     Pool<Framebuffer> framebuffers;
     Pool<Image> images;
+    Pool<Buffer> buffers;
 
     /// ---
 
@@ -90,6 +91,14 @@ struct Device
     Handle<Image> create_image(const ImageDescription &image_desc, Option<VkImage> proxy = {});
     void destroy_image(Handle<Image> image_handle);
 
+    Handle<Buffer> create_buffer(const BufferDescription &buffer_desc);
+    void *map_buffer(Handle<Buffer> buffer_handle);
+
+    template<typename T>
+    inline T *map_buffer(Handle<Buffer> buffer_handle) { return reinterpret_cast<T*>(map_buffer(buffer_handle)); }
+
+    void destroy_buffer(Handle<Buffer> buffer_handle);
+
     // Programs
     unsigned compile(Handle<GraphicsProgram> &program_handle, const RenderState &render_state);
 
@@ -100,7 +109,7 @@ struct Device
 
     void wait_for(Receipt &receipt);
     void wait_idle();
-    Receipt submit(Work &work, Receipt *reuse_receipt);
+    Receipt submit(Work &work, Receipt *reuse_receipt = nullptr);
 
     // Swapchain
     std::pair<Receipt, bool> acquire_next_swapchain(Surface &surface, Receipt *reuse_receipt = nullptr);

@@ -142,34 +142,26 @@ void Device::destroy(const Context &context)
     UNUSED(context);
 
     if (device == VK_NULL_HANDLE)
-    {
         return;
-    }
 
     for (auto &[handle, _] : graphics_programs)
-    {
         destroy_program(handle);
-    }
 
     for (auto &[handle, _] : shaders)
-    {
         destroy_shader(handle);
-    }
 
     for (auto &[handle, _] : renderpasses)
-    {
         destroy_renderpass(handle);
-    }
 
     for (auto &[handle, _] : framebuffers)
-    {
         destroy_framebuffer(handle);
-    }
 
     for (auto &[handle, _] : images)
-    {
         destroy_image(handle);
-    }
+
+    for (auto &[handle, _] : buffers)
+        destroy_buffer(handle);
+
     vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
 
     vmaDestroyAllocator(allocator);
