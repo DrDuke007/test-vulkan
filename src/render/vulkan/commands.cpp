@@ -48,6 +48,40 @@ void ComputeWork::clear_image(Handle<Image> image_handle, VkClearColorValue clea
     vkCmdClearColorImage(command_buffer, image.vkhandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1, &image.full_range);
 }
 
+/// --- GraphicsWork
+
+void GraphicsWork::begin_pass(Handle<RenderPass> renderpass_handle, Handle<Framebuffer> framebuffer_handle, Vec<Handle<Image>> attachments, Vec<VkClearValue> clear_values)
+{
+    auto &renderpass = *device->renderpasses.get(renderpass_handle);
+    auto &framebuffer = *device->framebuffers.get(framebuffer_handle);
+
+    Vec<VkImageView> views(attachments.size());
+    for (u32 i_attachment = 0; i_attachment < attachments.size(); i_attachment++)
+    {
+        views[i_attachment] = device->images.get(attachments[i_attachment])->full_view;
+    }
+
+    VkRenderPassAttachmentBeginInfo attachments_info = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO };
+    attachments_info.attachmentCount = views.size();
+    attachments_info.pAttachments = views.data();
+
+    VkRenderPassBeginInfo begin_info = { .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    begin_info.pNext = &attachments_info;
+    begin_info.renderPass = renderpass.vkhandle;
+    begin_info.framebuffer = framebuffer.vkhandle;
+    begin_info.renderArea.extent.width = framebuffer.desc.width;
+    begin_info.renderArea.extent.height = framebuffer.desc.height;
+    begin_info.clearValueCount = clear_values.size();
+    begin_info.pClearValues = clear_values.data();
+
+    vkCmdBeginRenderPass(command_buffer, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void GraphicsWork::end_pass()
+{
+    vkCmdEndRenderPass(command_buffer);
+}
+
 /// --- Device
 
 // WorkPool

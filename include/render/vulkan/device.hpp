@@ -57,6 +57,7 @@ struct Device
     Pool<Shader> shaders;
     Pool<GraphicsProgram> graphics_programs;
     Pool<RenderPass> renderpasses;
+    Pool<Framebuffer> framebuffers;
     Pool<Image> images;
 
     /// ---
@@ -80,6 +81,10 @@ struct Device
     Handle<RenderPass> create_renderpass(const RenderAttachments &render_attachments);
     Handle<RenderPass> find_or_create_renderpass(const RenderAttachments &render_attachments);
     void destroy_renderpass(Handle<RenderPass> renderpass_handle);
+
+    Handle<Framebuffer> create_framebuffer(const FramebufferDescription &desc);
+    Handle<Framebuffer> find_or_create_framebuffer(const FramebufferDescription &desc);
+    void destroy_framebuffer(Handle<Framebuffer> framebuffer_handle);
 
     Handle<Image> create_image(const ImageDescription &image_desc, Option<VkImage> proxy = {});
     void destroy_image(Handle<Image> image_handle);

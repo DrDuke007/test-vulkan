@@ -132,7 +132,7 @@ struct ComputeWork : TransferWork
 struct GraphicsWork : ComputeWork
 {
     void draw();
-    void begin_pass();
+    void begin_pass(Handle<RenderPass> renderpass_handle, Handle<Framebuffer> framebuffer_handle, Vec<Handle<Image>> attachments, Vec<VkClearValue> clear_values);
     void end_pass();
     void bind_pipeline();
 };

@@ -54,6 +54,21 @@ Handle<Image> Device::create_image(const ImageDescription &image_desc, Option<Vk
                                 nullptr));
     }
 
+    VkImageView full_view = VK_NULL_HANDLE;
+    VkImageViewCreateInfo vci = {.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    vci.flags                 = 0;
+    vci.image                 = vkhandle;
+    vci.format                = image_desc.format;
+    vci.components.r          = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.components.g          = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.components.b          = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.components.a          = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.subresourceRange      = full_range;
+    vci.viewType              = VK_IMAGE_VIEW_TYPE_2D;
+
+    VK_CHECK(vkCreateImageView(device, &vci, nullptr, &full_view));
+
+
     return images.add({
             .desc = image_desc,
             .vkhandle = vkhandle,
@@ -61,6 +76,7 @@ Handle<Image> Device::create_image(const ImageDescription &image_desc, Option<Vk
             .usage = ImageUsage::None,
             .is_proxy = proxy.has_value(),
             .full_range = full_range,
+            .full_view = full_view,
         });
 }
 
@@ -72,6 +88,7 @@ void Device::destroy_image(Handle<Image> image_handle)
         {
             vmaDestroyImage(allocator, image->vkhandle, image->allocation);
         }
+        vkDestroyImageView(device, image->full_view, nullptr);
         images.remove(image_handle);
     }
 }

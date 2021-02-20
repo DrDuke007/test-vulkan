@@ -65,6 +65,7 @@ struct Image
     ImageUsage usage = ImageUsage::None;
     bool is_proxy = false;
     VkImageSubresourceRange full_range;
+    VkImageView full_view;
     bool operator==(const Image &b) const = default;
 };
 
@@ -121,6 +122,31 @@ struct RenderState
     bool alpha_blending = false;
 
     bool operator==(const RenderState &) const = default;
+};
+
+struct FramebufferAttachment
+{
+    u32 width = 0;
+    u32 height = 0;
+    u32 layer_count = 1;
+    VkFormat format = VK_FORMAT_UNDEFINED;
+    bool operator==(const FramebufferAttachment &) const = default;
+};
+
+struct FramebufferDescription
+{
+    u32 width = 0;
+    u32 height = 0;
+    u32 layer_count = 1;
+    Vec<FramebufferAttachment> attachments;
+    bool operator==(const FramebufferDescription &) const = default;
+};
+
+struct  Framebuffer
+{
+    VkFramebuffer vkhandle = VK_NULL_HANDLE;
+    FramebufferDescription desc;
+    bool operator==(const Framebuffer &) const = default;
 };
 
 struct RenderAttachment

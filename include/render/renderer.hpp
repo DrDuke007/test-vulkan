@@ -14,6 +14,7 @@ struct Renderer
     // ImGuiPass
     Handle<gfx::GraphicsProgram> gui_program;
     Handle<gfx::RenderPass> gui_renderpass;
+    Handle<gfx::Framebuffer> gui_framebuffer;
     Handle<gfx::Image> gui_font_atlas;
 
     // Command submission

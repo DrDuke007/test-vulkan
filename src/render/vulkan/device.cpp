@@ -130,7 +130,6 @@ void Device::destroy(const Context &context)
         return;
     }
 
-
     for (auto &[handle, _] : graphics_programs)
     {
         destroy_program(handle);
@@ -146,11 +145,15 @@ void Device::destroy(const Context &context)
         destroy_renderpass(handle);
     }
 
+    for (auto &[handle, _] : framebuffers)
+    {
+        destroy_framebuffer(handle);
+    }
+
     for (auto &[handle, _] : images)
     {
         destroy_image(handle);
     }
-
     vmaDestroyAllocator(allocator);
     vkDestroyDevice(device, nullptr);
 }

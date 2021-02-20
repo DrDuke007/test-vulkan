@@ -7,47 +7,7 @@
 namespace vulkan
 {
 
-Handle<GraphicsProgram> Device::create_program(const GraphicsState &graphics_state)
-{
-    DescriptorSet set = create_descriptor_set(*this, graphics_state);
-
-    VkPipelineLayoutCreateInfo pipeline_layout_info = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    pipeline_layout_info.setLayoutCount = 1;
-    pipeline_layout_info.pSetLayouts = &set.layout;
-
-    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
-    VK_CHECK(vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout));
-
-    VkPipelineCacheCreateInfo cache_info = {.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
-    VkPipelineCache cache = VK_NULL_HANDLE;
-    VK_CHECK(vkCreatePipelineCache(device, &cache_info, nullptr, &cache));
-
-    return graphics_programs.add({
-        .graphics_state = std::move(graphics_state),
-        .pipeline_layout = pipeline_layout,
-        .cache = cache,
-        .descriptor_set = std::move(set),
-    });
-}
-
-void Device::destroy_program(Handle<GraphicsProgram> program_handle)
-{
-    if (auto *program = graphics_programs.get(program_handle))
-    {
-        for (auto pipeline : program->pipelines)
-        {
-            vkDestroyPipeline(device, pipeline, nullptr);
-        }
-
-        vkDestroyPipelineCache(device, program->cache, nullptr);
-        vkDestroyPipelineLayout(device, program->pipeline_layout, nullptr);
-
-        destroy_descriptor_set(*this, program->descriptor_set);
-
-        graphics_programs.remove(program_handle);
-    }
-}
-
+/// --- Renderpass
 
 Handle<RenderPass> Device::create_renderpass(const RenderAttachments &render_attachments)
 {
@@ -69,7 +29,7 @@ Handle<RenderPass> Device::create_renderpass(const RenderAttachments &render_att
                 .samples = color.samples,
                 .loadOp = color.load_op,
                 .storeOp = color.store_op,
-                .initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                .initialLayout = color.load_op == VK_ATTACHMENT_LOAD_OP_CLEAR ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                 .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
             });
     }
@@ -141,6 +101,119 @@ void Device::destroy_renderpass(Handle<RenderPass> renderpass_handle)
     {
         vkDestroyRenderPass(device, renderpass->vkhandle, nullptr);
         renderpasses.remove(renderpass_handle);
+    }
+}
+
+/// --- Framebuffer
+
+Handle<Framebuffer> Device::create_framebuffer(const FramebufferDescription &desc)
+{
+    // Imageless framebuffer
+
+    RenderAttachments render_attachments;
+    Vec<VkFramebufferAttachmentImageInfo> image_infos(desc.attachments.size());
+
+    for (u32 i_image = 0; i_image < desc.attachments.size(); i_image++)
+    {
+        VkFormat image_format = desc.attachments[i_image].format;
+
+        image_infos[i_image] = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO};
+        image_infos[i_image].flags = 0;
+        image_infos[i_image].usage = color_attachment_usage;
+        image_infos[i_image].width = desc.attachments[i_image].width;
+        image_infos[i_image].height = desc.attachments[i_image].height;
+        image_infos[i_image].layerCount = desc.attachments[i_image].layer_count;
+        image_infos[i_image].viewFormatCount = 1;
+        image_infos[i_image].pViewFormats = &desc.attachments[i_image].format;
+
+        render_attachments.colors.push_back({.format = image_format});
+    }
+
+    VkFramebufferAttachmentsCreateInfo attachments_info = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO};
+    attachments_info.attachmentImageInfoCount = image_infos.size();
+    attachments_info.pAttachmentImageInfos = image_infos.data();
+
+    auto &renderpass = *renderpasses.get(find_or_create_renderpass(render_attachments));
+
+    VkFramebufferCreateInfo fb_info = { .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+    fb_info.pNext = &attachments_info;
+    fb_info.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
+    fb_info.renderPass = renderpass.vkhandle;
+    fb_info.attachmentCount = image_infos.size();
+    fb_info.width = desc.width;
+    fb_info.height = desc.height;
+    fb_info.layers = desc.layer_count;
+
+    VkFramebuffer vkhandle = VK_NULL_HANDLE;
+    VK_CHECK(vkCreateFramebuffer(device, &fb_info, nullptr, &vkhandle));
+
+    return framebuffers.add({
+            .vkhandle = vkhandle,
+            .desc = desc
+        });
+}
+
+Handle<Framebuffer> Device::find_or_create_framebuffer(const FramebufferDescription &desc)
+{
+    for (auto &[handle, framebuffer] : framebuffers)
+    {
+        if (framebuffer->desc == desc)
+        {
+            return handle;
+        }
+    }
+    return create_framebuffer(desc);
+}
+
+void Device::destroy_framebuffer(Handle<Framebuffer> framebuffer_handle)
+{
+    if (auto *framebuffer = framebuffers.get(framebuffer_handle))
+    {
+        vkDestroyFramebuffer(device, framebuffer->vkhandle, nullptr);
+        framebuffers.remove(framebuffer_handle);
+    }
+}
+
+/// --- Graphics program
+
+Handle<GraphicsProgram> Device::create_program(const GraphicsState &graphics_state)
+{
+    DescriptorSet set = create_descriptor_set(*this, graphics_state);
+
+    VkPipelineLayoutCreateInfo pipeline_layout_info = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &set.layout;
+
+    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+    VK_CHECK(vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout));
+
+    VkPipelineCacheCreateInfo cache_info = {.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO};
+    VkPipelineCache cache = VK_NULL_HANDLE;
+    VK_CHECK(vkCreatePipelineCache(device, &cache_info, nullptr, &cache));
+
+    return graphics_programs.add({
+        .graphics_state = std::move(graphics_state),
+        .pipeline_layout = pipeline_layout,
+        .cache = cache,
+        .descriptor_set = std::move(set),
+    });
+}
+
+void Device::destroy_program(Handle<GraphicsProgram> program_handle)
+{
+    if (auto *program = graphics_programs.get(program_handle))
+    {
+        for (auto pipeline : program->pipelines)
+        {
+            vkDestroyPipeline(device, pipeline, nullptr);
+        }
+
+        vkDestroyPipelineCache(device, program->cache, nullptr);
+        vkDestroyPipelineLayout(device, program->pipeline_layout, nullptr);
+
+        destroy_descriptor_set(*this, program->descriptor_set);
+
+        graphics_programs.remove(program_handle);
     }
 }
 

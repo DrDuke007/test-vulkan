@@ -26,10 +26,12 @@ Renderer Renderer::create(const platform::Window *window)
         receipt = device.signaled_receipt();
     }
 
+    auto &surface = *renderer.context.surface;
+
     gfx::GraphicsState gui_state = {};
     gui_state.vertex_shader   =  device.create_shader("shaders/gui.vert.spv");
     gui_state.fragment_shader =  device.create_shader("shaders/gui.frag.spv");
-    gui_state.attachments.colors.push_back({.format = VK_FORMAT_R8G8B8A8_UNORM});
+    gui_state.attachments.colors.push_back({.format = surface.format.format});
     // gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
     gui_state.descriptors = {
         {.type = gfx::DescriptorType::StorageBuffer},
@@ -46,6 +48,18 @@ Renderer Renderer::create(const platform::Window *window)
     renderer.gui_font_atlas = device.create_image({
             .name = "Font Atlas",
             .size = {256, 256, 1},
+        });
+
+    renderer.gui_renderpass = device.find_or_create_renderpass(gui_state.attachments);
+
+    Vec<gfx::FramebufferAttachment> fb_attachments = {
+        {.width = surface.extent.width, .height = surface.extent.height, .format = surface.format.format}
+    };
+
+    renderer.gui_framebuffer = device.create_framebuffer({
+            .width = surface.extent.width,
+            .height = surface.extent.height,
+            .attachments = fb_attachments,
         });
 
     return renderer;
@@ -95,6 +109,18 @@ void Renderer::on_resize()
         device.destroy_receipt(receipt);
         receipt = device.signaled_receipt();
     }
+
+    Vec<gfx::FramebufferAttachment> fb_attachments = {
+        {.width = surface.extent.width, .height = surface.extent.height, .format = surface.format.format}
+    };
+
+    device.destroy_framebuffer(gui_framebuffer);
+    gui_framebuffer = device.create_framebuffer({
+            .width = surface.extent.width,
+            .height = surface.extent.height,
+            .attachments = fb_attachments,
+        });
+
 }
 
 void Renderer::update()
@@ -132,8 +158,17 @@ void Renderer::update()
         auto swapchain_image = context.surface->images[context.surface->current_image];
 
         cmd.begin();
-        cmd.barrier(swapchain_image, gfx::ImageUsage::TransferDst);
-        cmd.clear_image(swapchain_image, {.float32 = {1.0f, 0.0f, 0.0f, 1.0f}});
+        if (0)
+        {
+            cmd.barrier(swapchain_image, gfx::ImageUsage::TransferDst);
+            cmd.clear_image(swapchain_image, {.float32 = {1.0f, 0.0f, 0.0f, 1.0f}});
+        }
+        else
+        {
+            cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {1.0f, 0.0f, 0.0f, 1.0f}}}});
+            cmd.end_pass();
+        }
+
         cmd.barrier(swapchain_image, gfx::ImageUsage::Present);
         cmd.end();
     }
