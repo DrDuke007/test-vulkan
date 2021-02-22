@@ -86,7 +86,8 @@ enum struct BufferUsage
     TransferSrc,
     IndexBuffer,
     VertexBuffer,
-    DrawCommands
+    DrawCommands,
+    HostWrite
 };
 
 struct BufferAccess

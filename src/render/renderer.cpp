@@ -47,7 +47,6 @@ Renderer Renderer::create(const platform::Window *window)
     uint gui_default = device.compile(renderer.gui_program, state);
     UNUSED(gui_default);
 
-    ImGui::CreateContext();
     auto &io = ImGui::GetIO();
     u8 *pixels = nullptr;
     int width  = 0;
@@ -75,14 +74,15 @@ Renderer Renderer::create(const platform::Window *window)
             .name = "Imgui vertices",
             .size = 1_MiB,
             .usage = gfx::storage_buffer_usage,
-            .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
+
+    auto staging_usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
     renderer.gui_vertices_staging = device.create_buffer({
             .name = "Imgui vertices staging",
             .size = 1_MiB,
             .usage = gfx::source_buffer_usage,
-            .memory_usage = VMA_MEMORY_USAGE_CPU_ONLY,
+            .memory_usage = staging_usage,
         });
 
 
@@ -90,28 +90,26 @@ Renderer Renderer::create(const platform::Window *window)
             .name = "Imgui indices",
             .size = 1_MiB,
             .usage = gfx::index_buffer_usage,
-            .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
 
     renderer.gui_indices_staging = device.create_buffer({
             .name = "Imgui indices staging",
             .size = 1_MiB,
             .usage = gfx::source_buffer_usage,
-            .memory_usage = VMA_MEMORY_USAGE_CPU_ONLY,
+            .memory_usage = staging_usage,
         });
 
     renderer.gui_options = device.create_buffer({
             .name = "Imgui options",
             .size = 1_KiB,
             .usage = gfx::storage_buffer_usage,
-            .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
 
     renderer.gui_options_staging = device.create_buffer({
             .name = "Imgui draw data staging",
             .size = 1_KiB,
             .usage = gfx::source_buffer_usage,
-            .memory_usage = VMA_MEMORY_USAGE_CPU_ONLY,
+            .memory_usage = staging_usage,
         });
 
     return renderer;
@@ -204,10 +202,10 @@ void Renderer::update()
     assert(sizeof(ImDrawVert) * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
     assert(sizeof(ImDrawIdx)  * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
 
-    auto *vertices = device.map_buffer<ImDrawVert>(gui_vertices);
-    auto *indices  = device.map_buffer<ImDrawIdx>(gui_indices);
-    std::memset(vertices, 0, 1_MiB);
-    std::memset(indices, 0, 1_MiB);
+    auto *vertices = device.map_buffer<ImDrawVert>(gui_vertices_staging);
+    auto *indices  = device.map_buffer<ImDrawIdx>(gui_indices_staging);
+    // std::memset(vertices, 0, 1_MiB);
+    // std::memset(indices, 0, 1_MiB);
 
     for (int i = 0; i < data->CmdListsCount; i++)
     {
@@ -227,13 +225,22 @@ void Renderer::update()
         indices  += cmd_list.IdxBuffer.Size;
     }
 
-    auto *options = device.map_buffer<float>(gui_options);
+    auto *options = device.map_buffer<float>(gui_options_staging);
     std::memset(vertices, 0, 1_KiB);
     options[0] = 2.0f / data->DisplaySize.x; // X Scale
     options[1] = 2.0f / data->DisplaySize.y; // Y Scale
     options[2] = -1.0f - data->DisplayPos.x * options[0]; // X Translation
     options[3] = -1.0f - data->DisplayPos.y * options[1]; // Y Translation
 
+    // Transfer all buffers
+    gfx::TransferWork transfer_cmd = device.get_transfer_work(work_pool);
+    transfer_cmd.begin();
+    // transfer_cmd.barriers({}, {{gui_vertices_staging, gfx::BufferUsage::TransferSrc}, {gui_indices_staging, gfx::BufferUsage::TransferSrc}, {gui_vertices, gfx::BufferUsage::TransferDst}, {gui_indices, gfx::BufferUsage::TransferDst}});
+    transfer_cmd.copy_buffer(gui_vertices_staging, gui_vertices);
+    transfer_cmd.copy_buffer(gui_indices_staging, gui_indices);
+    transfer_cmd.copy_buffer(gui_options_staging, gui_options);
+    transfer_cmd.end();
+    transfer_done[current_frame] = device.submit(transfer_cmd, &transfer_done[current_frame]);
 
     // receipt contains the image acquired semaphore
     auto &image_acquired = this->image_acquired[current_frame];
@@ -251,7 +258,7 @@ void Renderer::update()
     // previous wait_for was waiting because we are waiting on the device,
     // here the wait_for is in a command buffer, so on the gpu
     cmd.wait_for(image_acquired, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    // cmd.wait_for(transfer_done[current_frame], VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+    cmd.wait_for(transfer_done[current_frame], VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
 
     // do random stuff
     {

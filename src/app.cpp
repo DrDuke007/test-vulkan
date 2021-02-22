@@ -4,9 +4,9 @@
 App::App()
 {
     platform::Window::create(window, 1280, 720, "Multi viewport");
+    UI::Context::create(ui);
     renderer = Renderer::create(&window);
 
-    UI::Context::create(ui);
 
     inputs.bind(Action::QuitApp, {.keys = {VirtualKey::Escape}});
     inputs.bind(Action::CameraModifier, {.keys = {VirtualKey::LAlt}});

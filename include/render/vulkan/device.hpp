@@ -111,6 +111,7 @@ struct Device
 
     template<typename T>
     inline T *map_buffer(Handle<Buffer> buffer_handle) { return reinterpret_cast<T*>(map_buffer(buffer_handle)); }
+    void flush_buffer(Handle<Buffer> buffer_handle);
 
     void destroy_buffer(Handle<Buffer> buffer_handle);
 

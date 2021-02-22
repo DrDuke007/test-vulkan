@@ -74,4 +74,13 @@ void *Device::map_buffer(Handle<Buffer> buffer_handle)
     return buffer.mapped;
 }
 
+void Device::flush_buffer(Handle<Buffer> buffer_handle)
+{
+    auto &buffer = *buffers.get(buffer_handle);
+    if (buffer.mapped)
+    {
+        vmaFlushAllocation(allocator, buffer.allocation, 0, buffer.desc.size);
+    }
+}
+
 }
