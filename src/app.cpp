@@ -5,10 +5,18 @@ App::App()
 {
     platform::Window::create(window, 1280, 720, "Multi viewport");
     renderer = Renderer::create(&window);
+
+    UI::Context::create(ui);
+
+    inputs.bind(Action::QuitApp, {.keys = {VirtualKey::Escape}});
+    inputs.bind(Action::CameraModifier, {.keys = {VirtualKey::LAlt}});
+    inputs.bind(Action::CameraMove, {.mouse_buttons = {MouseButton::Left}});
+    inputs.bind(Action::CameraOrbit, {.mouse_buttons = {MouseButton::Right}});
 }
 
 App::~App()
 {
+    ui.destroy();
     renderer.destroy();
 }
 
@@ -35,6 +43,13 @@ void App::run()
             }
         }
 
+        inputs.process(window.events);
+
+        if (inputs.is_pressed(Action::QuitApp))
+        {
+            window.stop = true;
+        }
+
         if (last_resize)
         {
             auto resize = *last_resize;
@@ -55,6 +70,9 @@ void App::run()
             continue;
         }
 
+        ui.start_frame(window, inputs);
+        ui.display_ui();
+        inputs.display_ui(ui);
         renderer.update();
     }
 }

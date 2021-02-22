@@ -27,6 +27,9 @@ DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphic
         binding_number += 1;
     }
 
+    Descriptor empty = {{{}}};
+    descriptor_set.descriptors.resize(graphics_state.descriptors.size(), empty);
+
     VkDescriptorSetLayoutCreateInfo desc_layout_info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     desc_layout_info.bindingCount = bindings.size();
     desc_layout_info.pBindings    = bindings.data();
@@ -76,7 +79,6 @@ VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set
 
     set.hashes.push_back(hash);
 
-
     VkDescriptorSetAllocateInfo set_info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
     set_info.descriptorPool              = device.descriptor_pool;
     set_info.pSetLayouts                 = &set.layout;
@@ -84,6 +86,56 @@ VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set
 
     VkDescriptorSet vkhandle = VK_NULL_HANDLE;
     VK_CHECK(vkAllocateDescriptorSets(device.device, &set_info, &vkhandle));
+
+    Vec<VkWriteDescriptorSet> writes(set.descriptors.size());
+
+    // writes' elements contain pointers to these buffers, so they have to be allocated with the right size
+    Vec<VkDescriptorImageInfo> images_info;
+    Vec<VkDescriptorBufferInfo> buffers_info;
+    buffers_info.reserve(set.descriptors.size());
+    images_info.reserve(set.descriptors.size());
+
+    for (uint slot = 0; slot < set.descriptors.size(); slot++)
+    {
+        writes[slot]                  = {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        writes[slot].dstSet           = vkhandle;
+        writes[slot].dstBinding       = slot;
+        writes[slot].descriptorCount  = set.descriptor_desc[slot].count;
+        writes[slot].descriptorType   = to_vk(set.descriptor_desc[slot]);
+
+        if (set.descriptor_desc[slot].type == DescriptorType::StorageBuffer)
+        {
+            if (!set.descriptors[slot].buffer.buffer_handle.is_valid())
+                log::error("Binding #{} has an invalid buffer handle.\n", slot);
+
+            auto &buffer = *device.buffers.get(set.descriptors[slot].buffer.buffer_handle);
+            buffers_info.push_back({
+                    .buffer = buffer.vkhandle,
+                    .offset = 0,
+                    .range = buffer.desc.size,
+                });
+            writes[slot].pBufferInfo = &buffers_info.back();
+        }
+        else if (set.descriptor_desc[slot].type == DescriptorType::SampledImage)
+        {
+            if (!set.descriptors[slot].image.image_handle.is_valid())
+                log::error("Binding #{} has an invalid image handle.\n", slot);
+
+            auto &image = *device.images.get(set.descriptors[slot].image.image_handle);
+            images_info.push_back({
+                    .sampler = device.samplers[BuiltinSampler::Default],
+                    .imageView = image.full_view,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                });
+            writes[slot].pImageInfo = &images_info.back();
+        }
+        else
+        {
+            log::error("Binding #{} has an invalid descriptor type.\n", slot);
+        }
+    }
+
+    vkUpdateDescriptorSets(device.device, writes.size(), writes.data(), 0, nullptr);
 
     set.vkhandles.push_back(vkhandle);
 

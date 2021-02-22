@@ -30,6 +30,16 @@ Handle<Buffer> Device::create_buffer(const BufferDescription &buffer_desc)
                              reinterpret_cast<VkBuffer *>(&vkhandle),
                              &allocation,
                              nullptr));
+
+    if (vkSetDebugUtilsObjectNameEXT)
+    {
+        VkDebugUtilsObjectNameInfoEXT name_info = {.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT};
+        name_info.objectHandle                  = reinterpret_cast<u64>(vkhandle);
+        name_info.objectType                    = VK_OBJECT_TYPE_BUFFER;
+        name_info.pObjectName                   = buffer_desc.name.c_str();
+        VK_CHECK(vkSetDebugUtilsObjectNameEXT(device, &name_info));
+    }
+
     return buffers.add({
             .desc = buffer_desc,
             .vkhandle = vkhandle,

@@ -95,6 +95,8 @@ shaders_dep = declare_dependency(sources: shader_targets)
 # - Main target
 main_src = [
   'src/app.cpp',
+  'src/ui.cpp',
+  'src/inputs.cpp',
   'src/base/pool.cpp',
   'src/base/vectors.cpp',
   'src/render/renderer.cpp',

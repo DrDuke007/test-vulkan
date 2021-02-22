@@ -19,6 +19,14 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
     Device device = {};
     device.physical_device = physical_device;
 
+#define X(name) device.name = context.name
+    X(vkCreateDebugUtilsMessengerEXT);
+    X(vkDestroyDebugUtilsMessengerEXT);
+    X(vkCmdBeginDebugUtilsLabelEXT);
+    X(vkCmdEndDebugUtilsLabelEXT);
+    X(vkSetDebugUtilsObjectNameEXT);
+#undef X
+
     vkGetPhysicalDeviceProperties(device.physical_device, &device.physical_props);
 
     /// --- Create the logical device
@@ -134,6 +142,22 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
 
     VK_CHECK(vkCreateDescriptorPool(device.device, &pool_info, nullptr, &device.descriptor_pool));
 
+    device.samplers.resize(1);
+    VkSamplerCreateInfo sampler_info = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+    sampler_info.magFilter           = VK_FILTER_LINEAR;
+    sampler_info.minFilter           = VK_FILTER_LINEAR;
+    sampler_info.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.addressModeU        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.compareOp           = VK_COMPARE_OP_NEVER;
+    sampler_info.borderColor         = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    sampler_info.minLod              = 0;
+    sampler_info.maxLod              = 7;
+    sampler_info.maxAnisotropy       = 8.0f;
+    sampler_info.anisotropyEnable    = true;
+    VK_CHECK(vkCreateSampler(device.device, &sampler_info, nullptr, &device.samplers[0]));
+
     return device;
 }
 
@@ -161,6 +185,9 @@ void Device::destroy(const Context &context)
 
     for (auto &[handle, _] : buffers)
         destroy_buffer(handle);
+
+    for (auto sampler : samplers)
+        vkDestroySampler(device, sampler, nullptr);
 
     vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
 

@@ -27,7 +27,7 @@ inline constexpr VkImageUsageFlags storage_image_usage = VK_IMAGE_USAGE_TRANSFER
 inline constexpr VkBufferUsageFlags storage_buffer_usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 inline constexpr VkBufferUsageFlags index_buffer_usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 inline constexpr VkBufferUsageFlags uniform_buffer_usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-inline constexpr VkBufferUsageFlags source_buffer_usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+inline constexpr VkBufferUsageFlags source_buffer_usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 struct ImageAccess
 {
@@ -235,4 +235,6 @@ struct GraphicsProgram
     // data binded to the program
     DescriptorSet descriptor_set;
 };
+
+struct ComputeProgram;
 }

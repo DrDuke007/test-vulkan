@@ -40,6 +40,12 @@ struct WorkPool
     CommandPool &transfer() { return command_pools[POOL_TYPE_TRANSFER]; }
 };
 
+enum BuiltinSampler
+{
+    Default = 0,
+    Count
+};
+
 struct Device
 {
     VkDevice device = VK_NULL_HANDLE;
@@ -61,11 +67,20 @@ struct Device
     Pool<Framebuffer> framebuffers;
     Pool<Image> images;
     Pool<Buffer> buffers;
+    Vec<VkSampler> samplers;
 
     /// ---
 
     static Device create(const Context &context, VkPhysicalDevice physical_device);
     void destroy(const Context &context);
+
+#define X(name) PFN_##name name
+    X(vkCreateDebugUtilsMessengerEXT);
+    X(vkDestroyDebugUtilsMessengerEXT);
+    X(vkCmdBeginDebugUtilsLabelEXT);
+    X(vkCmdEndDebugUtilsLabelEXT);
+    X(vkSetDebugUtilsObjectNameEXT);
+#undef X
 
     // Resources
     Receipt signaled_receipt();

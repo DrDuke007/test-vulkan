@@ -93,6 +93,11 @@ void TransferWork::copy_buffer(Handle<Buffer> src, Handle<Buffer> dst)
     vkCmdCopyBuffer(command_buffer, src_buffer.vkhandle, dst_buffer.vkhandle, 1, &copy);
 }
 
+void TransferWork::fill_buffer(Handle<Buffer> buffer_handle, u32 data)
+{
+    auto &buffer = *device->buffers.get(buffer_handle);
+    vkCmdFillBuffer(command_buffer, buffer.vkhandle, 0, buffer.desc.size, data);
+}
 /// --- ComputeWork
 
 void ComputeWork::clear_image(Handle<Image> image_handle, VkClearColorValue clear_color)
@@ -102,7 +107,35 @@ void ComputeWork::clear_image(Handle<Image> image_handle, VkClearColorValue clea
     vkCmdClearColorImage(command_buffer, image.vkhandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1, &image.full_range);
 }
 
+void ComputeWork::bind_buffer(Handle<GraphicsProgram> program_handle, uint slot, Handle<Buffer> buffer_handle)
+{
+    auto &program = *device->graphics_programs.get(program_handle);
+    ::vulkan::bind_buffer(program.descriptor_set, slot, buffer_handle);
+}
+
+void ComputeWork::bind_image(Handle<GraphicsProgram> program_handle, uint slot, Handle<Image> image_handle)
+{
+    auto &program = *device->graphics_programs.get(program_handle);
+    ::vulkan::bind_image(program.descriptor_set, slot, image_handle);
+}
+
 /// --- GraphicsWork
+
+
+void GraphicsWork::draw_indexed(const DrawIndexedOptions &options)
+{
+    vkCmdDrawIndexed(command_buffer, options.vertex_count, options.instance_count, options.index_offset, options.vertex_offset, options.instance_offset);
+}
+
+void GraphicsWork::set_scissor(const VkRect2D &rect)
+{
+    vkCmdSetScissor(command_buffer, 0, 1, &rect);
+}
+
+void GraphicsWork::set_viewport(const VkViewport &viewport)
+{
+    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+}
 
 void GraphicsWork::begin_pass(Handle<RenderPass> renderpass_handle, Handle<Framebuffer> framebuffer_handle, Vec<Handle<Image>> attachments, Vec<VkClearValue> clear_values)
 {
@@ -149,6 +182,12 @@ void GraphicsWork::bind_pipeline(Handle<GraphicsProgram> program_handle, uint pi
 
     vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program.pipeline_layout, 0, sets.size(), sets.data(), offsets.size(), offsets.data());
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+}
+
+void GraphicsWork::bind_index_buffer(Handle<Buffer> buffer_handle)
+{
+    auto &buffer = *device->buffers.get(buffer_handle);
+    vkCmdBindIndexBuffer(command_buffer, buffer.vkhandle, 0, VK_INDEX_TYPE_UINT16);
 }
 
 /// --- Device

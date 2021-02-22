@@ -121,6 +121,7 @@ struct Work
 struct TransferWork : Work
 {
     void copy_buffer(Handle<Buffer> src, Handle<Buffer> dst);
+    void fill_buffer(Handle<Buffer> buffer_handle, u32 data);
     void transfer();
 };
 
@@ -129,14 +130,30 @@ struct ComputeWork : TransferWork
     void clear_image(Handle<Image> image, VkClearColorValue clear_color);
 
     void dispatch();
-    void bind_pipeline();
+    void bind_pipeline(Handle<ComputeProgram> program_handle);
+
+    void bind_buffer(Handle<GraphicsProgram> program_handle, uint slot, Handle<Buffer> buffer_handle);
+    void bind_image(Handle<GraphicsProgram> program_handle, uint slot, Handle<Image> image_handle);
 };
 
 struct GraphicsWork : ComputeWork
 {
-    void draw();
+    struct DrawIndexedOptions
+    {
+        u32 vertex_count = 0;
+        u32 instance_count = 1;
+        u32 index_offset = 0;
+        i32 vertex_offset = 0;
+        u32 instance_offset = 0;
+    };
+    void draw_indexed(const DrawIndexedOptions &options);
+
+    void set_scissor(const VkRect2D &rect);
+    void set_viewport(const VkViewport &viewport);
+
     void begin_pass(Handle<RenderPass> renderpass_handle, Handle<Framebuffer> framebuffer_handle, Vec<Handle<Image>> attachments, Vec<VkClearValue> clear_values);
     void end_pass();
     void bind_pipeline(Handle<GraphicsProgram> program_handle, uint pipeline_index);
+    void bind_index_buffer(Handle<Buffer> buffer_handle);
 };
 }

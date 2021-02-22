@@ -21,6 +21,8 @@ struct Renderer
     Handle<gfx::Buffer> gui_vertices_staging;
     Handle<gfx::Buffer> gui_indices;
     Handle<gfx::Buffer> gui_indices_staging;
+    Handle<gfx::Buffer> gui_options;
+    Handle<gfx::Buffer> gui_options_staging;
 
     // Command submission
     std::array<gfx::WorkPool, FRAME_QUEUE_LENGTH> work_pools;

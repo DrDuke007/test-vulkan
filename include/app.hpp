@@ -2,6 +2,8 @@
 #include "base/types.hpp"
 #include "platform/window.hpp"
 #include "render/renderer.hpp"
+#include "inputs.hpp"
+#include "ui.hpp"
 
 class App
 {
@@ -17,4 +19,6 @@ class App
     platform::Window window;
     Renderer renderer;
     bool is_minimized;
+    UI::Context ui;
+    Inputs inputs;
 };
