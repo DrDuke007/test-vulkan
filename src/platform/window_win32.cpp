@@ -113,6 +113,10 @@ float2 Window::get_dpi_scale() const
 {
     int dpi     = GetDpiForWindow(win32.window);
     float scale = dpi / 96.0f;
+    if (scale == 0.0f)
+    {
+        scale = 1.0f;
+    }
     return float2(scale, scale);
 }
 

@@ -115,12 +115,14 @@ struct Work
     void wait_for(Receipt previous_work, VkPipelineStageFlags stage_dst);
 
     void barrier(Handle<Image> image, ImageUsage usage_destination);
+    void clear_barrier(Handle<Image> image, ImageUsage usage_destination);
     void barriers(Vec<std::pair<Handle<Image>, ImageUsage>> images, Vec<std::pair<Handle<Buffer>, BufferUsage>> buffers);
 };
 
 struct TransferWork : Work
 {
     void copy_buffer(Handle<Buffer> src, Handle<Buffer> dst);
+    void copy_buffer_to_image(Handle<Buffer> src, Handle<Image> dst);
     void fill_buffer(Handle<Buffer> buffer_handle, u32 data);
     void transfer();
 };

@@ -17,6 +17,7 @@ void Context::create(Context & /*ctx*/)
     ImGui::CreateContext();
 
     auto &io = ImGui::GetIO();
+    io.Fonts->AddFontDefault();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigDockingWithShift = false;
     io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)

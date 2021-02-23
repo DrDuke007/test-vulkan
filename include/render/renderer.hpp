@@ -15,7 +15,9 @@ struct Renderer
     Handle<gfx::GraphicsProgram> gui_program;
     Handle<gfx::RenderPass> gui_renderpass;
     Handle<gfx::Framebuffer> gui_framebuffer;
+
     Handle<gfx::Image> gui_font_atlas;
+    Handle<gfx::Buffer> gui_font_atlas_staging;
 
     Handle<gfx::Buffer> gui_vertices;
     Handle<gfx::Buffer> gui_vertices_staging;

@@ -41,6 +41,17 @@ void Work::barrier(Handle<Image> image_handle, ImageUsage usage_destination)
     image.usage = usage_destination;
 }
 
+void Work::clear_barrier(Handle<Image> image_handle, ImageUsage usage_destination)
+{
+    auto &image = *device->images.get(image_handle);
+
+    auto src_access = get_src_image_access(ImageUsage::None);
+    auto dst_access = get_dst_image_access(usage_destination);
+    auto b          = get_image_barrier(image.vkhandle, src_access, dst_access, image.full_range);
+    vkCmdPipelineBarrier(command_buffer, src_access.stage, dst_access.stage, 0, 0, nullptr, 0, nullptr, 1, &b);
+
+    image.usage = usage_destination;
+}
 
 void Work::barriers(Vec<std::pair<Handle<Image>, ImageUsage>> images, Vec<std::pair<Handle<Buffer>, BufferUsage>> buffers)
 {
@@ -91,6 +102,29 @@ void TransferWork::copy_buffer(Handle<Buffer> src, Handle<Buffer> dst)
     };
 
     vkCmdCopyBuffer(command_buffer, src_buffer.vkhandle, dst_buffer.vkhandle, 1, &copy);
+}
+
+void TransferWork::copy_buffer_to_image(Handle<Buffer> src, Handle<Image> dst)
+{
+    auto &src_buffer = *device->buffers.get(src);
+    auto &dst_image  = *device->images.get(dst);
+
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+
+    // If either of these values is zero, that aspect of the buffer memory is considered to be tightly packed according to the imageExtent.
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.mipLevel = dst_image.full_range.baseMipLevel;
+    region.imageSubresource.aspectMask = dst_image.full_range.aspectMask;
+    region.imageSubresource.layerCount = dst_image.full_range.layerCount;
+    region.imageSubresource.baseArrayLayer = dst_image.full_range.baseArrayLayer;
+    region.imageExtent.width = dst_image.desc.size.x;
+    region.imageExtent.height = dst_image.desc.size.y;
+    region.imageExtent.depth = dst_image.desc.size.z;
+
+    vkCmdCopyBufferToImage(command_buffer, src_buffer.vkhandle, dst_image.vkhandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
 void TransferWork::fill_buffer(Handle<Buffer> buffer_handle, u32 data)

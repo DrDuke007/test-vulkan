@@ -43,20 +43,43 @@ Renderer Renderer::create(const platform::Window *window)
 
     renderer.gui_program = device.create_program(gui_state);
 
-    gfx::RenderState state = {};
+    gfx::RenderState state = {.alpha_blending = true};
     uint gui_default = device.compile(renderer.gui_program, state);
     UNUSED(gui_default);
 
     auto &io = ImGui::GetIO();
-    u8 *pixels = nullptr;
+    uchar *pixels = nullptr;
     int width  = 0;
     int height = 0;
+    io.Fonts->Build();
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+    usize font_atlas_size = width * height * sizeof(u32);
 
     renderer.gui_font_atlas = device.create_image({
             .name = "Font Atlas",
             .size = {static_cast<u32>(width), static_cast<u32>(height), 1},
+            .format = VK_FORMAT_R8G8B8A8_UNORM,
         });
+
+    renderer.gui_font_atlas_staging = device.create_buffer({
+            .name = "Imgui font atlas staging",
+            .size = font_atlas_size,
+            .usage = gfx::source_buffer_usage,
+            .memory_usage = VMA_MEMORY_USAGE_CPU_ONLY,
+        });
+
+    uchar *p_font_atlas = device.map_buffer<uchar>(renderer.gui_font_atlas_staging);
+    for (uint i = 0; i < font_atlas_size; i++)
+    {
+        // log::info("{0:X}", pixels[i]);
+        // if (i % 8 == 0)
+        // {
+        //     log::info("\n");
+        // }
+        p_font_atlas[i] = pixels[i];
+    }
+    device.flush_buffer(renderer.gui_font_atlas_staging);
 
     renderer.gui_renderpass = device.find_or_create_renderpass(gui_state.attachments);
 
@@ -198,6 +221,7 @@ void Renderer::update()
     ImGui::Render();
 
     // Transfer stuff
+
     ImDrawData *data = ImGui::GetDrawData();
     assert(sizeof(ImDrawVert) * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
     assert(sizeof(ImDrawIdx)  * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
@@ -235,6 +259,11 @@ void Renderer::update()
     // Transfer all buffers
     gfx::TransferWork transfer_cmd = device.get_transfer_work(work_pool);
     transfer_cmd.begin();
+    if (frame_count == 0)
+    {
+        transfer_cmd.clear_barrier(gui_font_atlas, gfx::ImageUsage::TransferDst);
+        transfer_cmd.copy_buffer_to_image(gui_font_atlas_staging, gui_font_atlas);
+    }
     // transfer_cmd.barriers({}, {{gui_vertices_staging, gfx::BufferUsage::TransferSrc}, {gui_indices_staging, gfx::BufferUsage::TransferSrc}, {gui_vertices, gfx::BufferUsage::TransferDst}, {gui_indices, gfx::BufferUsage::TransferDst}});
     transfer_cmd.copy_buffer(gui_vertices_staging, gui_vertices);
     transfer_cmd.copy_buffer(gui_indices_staging, gui_indices);
@@ -269,7 +298,7 @@ void Renderer::update()
         cmd.barrier(swapchain_image, gfx::ImageUsage::ColorAttachment);
         cmd.barrier(gui_font_atlas, gfx::ImageUsage::GraphicsShaderRead);
 
-        cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {1.0f, 0.0f, 0.0f, 1.0f}}}});
+        cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
 
         cmd.bind_buffer(gui_program, 0, gui_vertices);
         cmd.bind_buffer(gui_program, 1, gui_options);
