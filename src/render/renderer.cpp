@@ -72,11 +72,6 @@ Renderer Renderer::create(const platform::Window *window)
     uchar *p_font_atlas = device.map_buffer<uchar>(renderer.gui_font_atlas_staging);
     for (uint i = 0; i < font_atlas_size; i++)
     {
-        // log::info("{0:X}", pixels[i]);
-        // if (i % 8 == 0)
-        // {
-        //     log::info("\n");
-        // }
         p_font_atlas[i] = pixels[i];
     }
     device.flush_buffer(renderer.gui_font_atlas_staging);
@@ -97,42 +92,21 @@ Renderer Renderer::create(const platform::Window *window)
             .name = "Imgui vertices",
             .size = 1_MiB,
             .usage = gfx::storage_buffer_usage,
+            .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
-
-    auto staging_usage = VMA_MEMORY_USAGE_CPU_ONLY;
-
-    renderer.gui_vertices_staging = device.create_buffer({
-            .name = "Imgui vertices staging",
-            .size = 1_MiB,
-            .usage = gfx::source_buffer_usage,
-            .memory_usage = staging_usage,
-        });
-
 
     renderer.gui_indices = device.create_buffer({
             .name = "Imgui indices",
             .size = 1_MiB,
             .usage = gfx::index_buffer_usage,
-        });
-
-    renderer.gui_indices_staging = device.create_buffer({
-            .name = "Imgui indices staging",
-            .size = 1_MiB,
-            .usage = gfx::source_buffer_usage,
-            .memory_usage = staging_usage,
+            .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
 
     renderer.gui_options = device.create_buffer({
             .name = "Imgui options",
             .size = 1_KiB,
             .usage = gfx::storage_buffer_usage,
-        });
-
-    renderer.gui_options_staging = device.create_buffer({
-            .name = "Imgui draw data staging",
-            .size = 1_KiB,
-            .usage = gfx::source_buffer_usage,
-            .memory_usage = staging_usage,
+            .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
 
     return renderer;
@@ -147,11 +121,9 @@ void Renderer::destroy()
     for (auto &receipt : rendering_done)
         device.destroy_receipt(receipt);
 
-    for (auto &receipt : image_acquired)
-        device.destroy_receipt(receipt);
+    device.destroy_receipt(image_acquired);
 
-    for (auto &receipt : transfer_done)
-        device.destroy_receipt(receipt);
+    device.destroy_receipt(transfer_done);
 
     for (auto &work_pool : work_pools)
     {
@@ -176,17 +148,11 @@ void Renderer::on_resize()
         receipt = device.signaled_receipt();
     }
 
-    for (auto &receipt : image_acquired)
-    {
-        device.destroy_receipt(receipt);
-        receipt = device.signaled_receipt();
-    }
+    device.destroy_receipt(image_acquired);
+    image_acquired = device.signaled_receipt();
 
-    for (auto &receipt : transfer_done)
-    {
-        device.destroy_receipt(receipt);
-        receipt = device.signaled_receipt();
-    }
+    device.destroy_receipt(transfer_done);
+    transfer_done = device.signaled_receipt();
 
     Vec<gfx::FramebufferAttachment> fb_attachments = {
         {.width = surface.extent.width, .height = surface.extent.height, .format = surface.format.format}
@@ -226,10 +192,8 @@ void Renderer::update()
     assert(sizeof(ImDrawVert) * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
     assert(sizeof(ImDrawIdx)  * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
 
-    auto *vertices = device.map_buffer<ImDrawVert>(gui_vertices_staging);
-    auto *indices  = device.map_buffer<ImDrawIdx>(gui_indices_staging);
-    // std::memset(vertices, 0, 1_MiB);
-    // std::memset(indices, 0, 1_MiB);
+    auto *vertices = device.map_buffer<ImDrawVert>(gui_vertices);
+    auto *indices  = device.map_buffer<ImDrawIdx>(gui_indices);
 
     for (int i = 0; i < data->CmdListsCount; i++)
     {
@@ -249,30 +213,25 @@ void Renderer::update()
         indices  += cmd_list.IdxBuffer.Size;
     }
 
-    auto *options = device.map_buffer<float>(gui_options_staging);
+    auto *options = device.map_buffer<float>(gui_options);
     std::memset(vertices, 0, 1_KiB);
     options[0] = 2.0f / data->DisplaySize.x; // X Scale
     options[1] = 2.0f / data->DisplaySize.y; // Y Scale
     options[2] = -1.0f - data->DisplayPos.x * options[0]; // X Translation
     options[3] = -1.0f - data->DisplayPos.y * options[1]; // Y Translation
 
-    // Transfer all buffers
-    gfx::TransferWork transfer_cmd = device.get_transfer_work(work_pool);
-    transfer_cmd.begin();
+
     if (frame_count == 0)
     {
+        gfx::TransferWork transfer_cmd = device.get_transfer_work(work_pool);
+        transfer_cmd.begin();
         transfer_cmd.clear_barrier(gui_font_atlas, gfx::ImageUsage::TransferDst);
         transfer_cmd.copy_buffer_to_image(gui_font_atlas_staging, gui_font_atlas);
+        transfer_cmd.end();
+        transfer_done = device.submit(transfer_cmd, &transfer_done);
     }
-    // transfer_cmd.barriers({}, {{gui_vertices_staging, gfx::BufferUsage::TransferSrc}, {gui_indices_staging, gfx::BufferUsage::TransferSrc}, {gui_vertices, gfx::BufferUsage::TransferDst}, {gui_indices, gfx::BufferUsage::TransferDst}});
-    transfer_cmd.copy_buffer(gui_vertices_staging, gui_vertices);
-    transfer_cmd.copy_buffer(gui_indices_staging, gui_indices);
-    transfer_cmd.copy_buffer(gui_options_staging, gui_options);
-    transfer_cmd.end();
-    transfer_done[current_frame] = device.submit(transfer_cmd, &transfer_done[current_frame]);
 
     // receipt contains the image acquired semaphore
-    auto &image_acquired = this->image_acquired[current_frame];
     bool out_of_date_swapchain = false;
     std::tie(image_acquired, out_of_date_swapchain) = device.acquire_next_swapchain(*context.surface, &image_acquired);
     if (out_of_date_swapchain)
@@ -287,7 +246,10 @@ void Renderer::update()
     // previous wait_for was waiting because we are waiting on the device,
     // here the wait_for is in a command buffer, so on the gpu
     cmd.wait_for(image_acquired, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    cmd.wait_for(transfer_done[current_frame], VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    if (frame_count == 0)
+    {
+        cmd.wait_for(transfer_done, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+    }
 
     // do random stuff
     {

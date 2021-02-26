@@ -20,18 +20,15 @@ struct Renderer
     Handle<gfx::Buffer> gui_font_atlas_staging;
 
     Handle<gfx::Buffer> gui_vertices;
-    Handle<gfx::Buffer> gui_vertices_staging;
     Handle<gfx::Buffer> gui_indices;
-    Handle<gfx::Buffer> gui_indices_staging;
     Handle<gfx::Buffer> gui_options;
-    Handle<gfx::Buffer> gui_options_staging;
 
     // Command submission
     std::array<gfx::WorkPool, FRAME_QUEUE_LENGTH> work_pools;
     std::array<gfx::Receipt,  FRAME_QUEUE_LENGTH> rendering_done;
-    std::array<gfx::Receipt,  FRAME_QUEUE_LENGTH> image_acquired;
 
-    std::array<gfx::Receipt,  FRAME_QUEUE_LENGTH> transfer_done;
+    gfx::Receipt image_acquired;
+    gfx::Receipt transfer_done;
 
     /// ---
 

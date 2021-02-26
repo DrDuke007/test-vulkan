@@ -78,6 +78,17 @@ device.present(done);
 
 last_frame_done = done;
 **/
+
+/** Semaphores/Fences
+
+acquire_next_image() -> Semaphore
+submit               -> Semaphore/Fence
+
+Semaphore -> present
+Semaphore -> cmd.wait_for
+Fence     -> device.wait_for
+
+ **/
 struct Device;
 struct Image;
 struct Surface;
@@ -95,6 +106,7 @@ struct Receipt
 {
     VkFence fence = VK_NULL_HANDLE;
     VkSemaphore semaphore = VK_NULL_HANDLE;
+    bool fence_reset = false;
 };
 
 // Command buffer / Queue abstraction

@@ -313,6 +313,7 @@ Receipt Device::signaled_receipt()
     VkFenceCreateInfo fci = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     fci.flags             = VK_FENCE_CREATE_SIGNALED_BIT;
     VK_CHECK(vkCreateFence(device, &fci, nullptr, &receipt.fence));
+    receipt.fence_reset = false;
     return receipt;
 }
 
@@ -358,7 +359,10 @@ Receipt Device::submit(Work &work, Receipt *reuse_receipt)
     }
 
     //TODO: check if needed
-    vkResetFences(device, 1, &receipt.fence);
+    if (receipt.fence_reset == false) {
+        vkResetFences(device, 1, &receipt.fence);
+        receipt.fence_reset = true;
+    }
 
     VkSubmitInfo submit_info            = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
     submit_info.waitSemaphoreCount      = wait_list.size();
@@ -370,6 +374,8 @@ Receipt Device::submit(Work &work, Receipt *reuse_receipt)
     submit_info.pSignalSemaphores       = &receipt.semaphore;
 
     VK_CHECK(vkQueueSubmit(work.queue, 1, &submit_info, receipt.fence));
+
+    receipt.fence_reset = false;
 
     return receipt;
 }
@@ -411,6 +417,7 @@ bool Device::present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool
 void Device::wait_for(Receipt &receipt)
 {
     assert(receipt.fence != VK_NULL_HANDLE);
+    assert(receipt.fence_reset == false);
 
     // 10 sec in nanoseconds
     u64 timeout = 10llu*1000llu*1000llu*1000llu;
@@ -423,6 +430,8 @@ void Device::wait_for(Receipt &receipt)
 
     // reset the fence for future use
     VK_CHECK(vkResetFences(device, 1, &receipt.fence));
+
+    receipt.fence_reset = true;
 }
 
 void Device::wait_idle()
