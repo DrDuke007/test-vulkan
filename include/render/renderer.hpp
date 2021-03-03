@@ -9,6 +9,7 @@ inline constexpr uint FRAME_QUEUE_LENGTH = 2;
 struct Renderer
 {
     gfx::Context context;
+
     uint frame_count;
 
     // ImGuiPass
@@ -25,10 +26,10 @@ struct Renderer
 
     // Command submission
     std::array<gfx::WorkPool, FRAME_QUEUE_LENGTH> work_pools;
-    std::array<gfx::Receipt,  FRAME_QUEUE_LENGTH> rendering_done;
 
-    gfx::Receipt image_acquired;
-    gfx::Receipt transfer_done;
+    gfx::Fence fence;
+    gfx::Fence transfer_done;
+    u64 transfer_fence_value = 0;
 
     /// ---
 

@@ -101,13 +101,12 @@ struct ResourceTransfer
     int resource;
 };
 
-// Indicates when work is done, either on CPU or GPU
-struct Receipt
+struct Fence
 {
-    VkFence fence = VK_NULL_HANDLE;
-    VkSemaphore semaphore = VK_NULL_HANDLE;
-    bool fence_reset = false;
+    VkSemaphore timeline_semaphore = VK_NULL_HANDLE;
+    u64 value = 0;
 };
+
 
 // Command buffer / Queue abstraction
 struct Work
@@ -115,16 +114,26 @@ struct Work
     Device *device;
 
     VkCommandBuffer command_buffer;
-    Vec<Receipt> wait_list;
+    Vec<Fence> wait_fence_list;
+    Vec<u64> wait_value_list;
     Vec<VkPipelineStageFlags> wait_stage_list;
     VkQueue queue;
+
+    // vulkan hacks:
+    Option<VkSemaphore> image_acquired_semaphore;
+    Option<VkPipelineStageFlags> image_acquired_stage;
+    Option<VkSemaphore> signal_present_semaphore;
 
     void begin();
     void end();
 
     ResourceTransfer send_to(int receiver, int resource);
     void receive(ResourceTransfer transfer);
-    void wait_for(Receipt previous_work, VkPipelineStageFlags stage_dst);
+    void wait_for(Fence &fence, u64 wait_value, VkPipelineStageFlags stage_dst);
+
+    // vulkan hacks:
+    void wait_for_acquired(Surface &surface, VkPipelineStageFlags stage_dst);
+    void prepare_present(Surface &surface);
 
     void barrier(Handle<Image> image, ImageUsage usage_destination);
     void clear_barrier(Handle<Image> image, ImageUsage usage_destination);

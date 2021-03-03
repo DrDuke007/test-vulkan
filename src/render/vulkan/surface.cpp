@@ -150,6 +150,20 @@ void Surface::create_swapchain(Device &device)
             vkimages[i_image]
         );
     }
+
+    this->can_present_semaphores.resize(images_count);
+    for (auto &semaphore : this->can_present_semaphores)
+    {
+        VkSemaphoreCreateInfo semaphore_info = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        VK_CHECK(vkCreateSemaphore(device.device, &semaphore_info, nullptr, &semaphore));
+    }
+
+    this->image_acquired_semaphores.resize(images_count);
+    for (auto &semaphore : this->image_acquired_semaphores)
+    {
+        VkSemaphoreCreateInfo semaphore_info = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        VK_CHECK(vkCreateSemaphore(device.device, &semaphore_info, nullptr, &semaphore));
+    }
 }
 
 void Surface::destroy_swapchain(Device &device)
@@ -157,6 +171,18 @@ void Surface::destroy_swapchain(Device &device)
     for (auto image : images)
     {
         device.destroy_image(image);
+    }
+
+    for (auto &semaphore : this->image_acquired_semaphores)
+    {
+        vkDestroySemaphore(device.device, semaphore, nullptr);
+        semaphore = VK_NULL_HANDLE;
+    }
+
+    for (auto &semaphore : this->can_present_semaphores)
+    {
+        vkDestroySemaphore(device.device, semaphore, nullptr);
+        semaphore = VK_NULL_HANDLE;
     }
 
     vkDestroySwapchainKHR(device.device, this->swapchain, nullptr);

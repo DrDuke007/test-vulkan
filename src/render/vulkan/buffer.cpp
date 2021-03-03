@@ -7,14 +7,12 @@ namespace vulkan
 {
 Handle<Buffer> Device::create_buffer(const BufferDescription &buffer_desc)
 {
-    std::array queue_indices {transfer_family_idx, compute_family_idx, graphics_family_idx};
-
     VkBufferCreateInfo buffer_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     buffer_info.usage              = buffer_desc.usage;
     buffer_info.size               = buffer_desc.size;
-    buffer_info.sharingMode        = VK_SHARING_MODE_CONCURRENT;
-    buffer_info.queueFamilyIndexCount = queue_indices.size();
-    buffer_info.pQueueFamilyIndices   = queue_indices.data();
+    buffer_info.sharingMode        = VK_SHARING_MODE_EXCLUSIVE;
+    buffer_info.queueFamilyIndexCount = 0;
+    buffer_info.pQueueFamilyIndices   = nullptr;
 
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage     = buffer_desc.memory_usage;

@@ -21,8 +21,11 @@ struct Surface
     VkSurfaceFormatKHR format;
     VkPresentModeKHR present_mode;
     VkExtent2D extent;
-    u32 current_image = u32_invalid;
+    u32 previous_image = 0;
+    u32 current_image = 0;
     Vec<Handle<Image>> images;
+    Vec<VkSemaphore> image_acquired_semaphores;
+    Vec<VkSemaphore> can_present_semaphores;
 
     static Surface create(Context &context, const platform::Window &window);
     void destroy(Context &context);

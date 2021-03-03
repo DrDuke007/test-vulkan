@@ -23,11 +23,6 @@ Renderer Renderer::create(const platform::Window *window)
         device.create_work_pool(work_pool);
     }
 
-    for (auto &receipt : renderer.rendering_done)
-    {
-        receipt = device.signaled_receipt();
-    }
-
     auto &surface = *renderer.context.surface;
 
     gfx::GraphicsState gui_state = {};
@@ -109,6 +104,9 @@ Renderer Renderer::create(const platform::Window *window)
             .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
 
+    renderer.fence = device.create_fence();
+    renderer.transfer_done = device.create_fence(renderer.transfer_fence_value);
+
     return renderer;
 }
 
@@ -118,12 +116,8 @@ void Renderer::destroy()
 
     device.wait_idle();
 
-    for (auto &receipt : rendering_done)
-        device.destroy_receipt(receipt);
-
-    device.destroy_receipt(image_acquired);
-
-    device.destroy_receipt(transfer_done);
+    device.destroy_fence(fence);
+    device.destroy_fence(transfer_done);
 
     for (auto &work_pool : work_pools)
     {
@@ -141,18 +135,6 @@ void Renderer::on_resize()
     device.wait_idle();
     surface.destroy_swapchain(device);
     surface.create_swapchain(device);
-
-    for (auto &receipt : rendering_done)
-    {
-        device.destroy_receipt(receipt);
-        receipt = device.signaled_receipt();
-    }
-
-    device.destroy_receipt(image_acquired);
-    image_acquired = device.signaled_receipt();
-
-    device.destroy_receipt(transfer_done);
-    transfer_done = device.signaled_receipt();
 
     Vec<gfx::FramebufferAttachment> fb_attachments = {
         {.width = surface.extent.width, .height = surface.extent.height, .format = surface.format.format}
@@ -176,9 +158,9 @@ void Renderer::update()
     io.DisplaySize.x = context.surface->extent.width;
     io.DisplaySize.y = context.surface->extent.height;
 
-    // wait for fence, blocking
-    auto &rendering_done = this->rendering_done[current_frame];
-    device.wait_for(rendering_done);
+    // wait for fence, blocking: dont wait for the first QUEUE_LENGTH frames
+    u64 wait_value = frame_count < FRAME_QUEUE_LENGTH ? 0 : frame_count-FRAME_QUEUE_LENGTH+1;
+    device.wait_for(fence, wait_value);
 
     // reset the command buffers
     auto &work_pool = work_pools[current_frame];
@@ -220,7 +202,6 @@ void Renderer::update()
     options[2] = -1.0f - data->DisplayPos.x * options[0]; // X Translation
     options[3] = -1.0f - data->DisplayPos.y * options[1]; // Y Translation
 
-
     if (frame_count == 0)
     {
         gfx::TransferWork transfer_cmd = device.get_transfer_work(work_pool);
@@ -228,12 +209,11 @@ void Renderer::update()
         transfer_cmd.clear_barrier(gui_font_atlas, gfx::ImageUsage::TransferDst);
         transfer_cmd.copy_buffer_to_image(gui_font_atlas_staging, gui_font_atlas);
         transfer_cmd.end();
-        transfer_done = device.submit(transfer_cmd, &transfer_done);
+        device.submit(transfer_cmd, {transfer_done}, {transfer_fence_value+1});
     }
 
     // receipt contains the image acquired semaphore
-    bool out_of_date_swapchain = false;
-    std::tie(image_acquired, out_of_date_swapchain) = device.acquire_next_swapchain(*context.surface, &image_acquired);
+    bool out_of_date_swapchain = device.acquire_next_swapchain(*context.surface);
     if (out_of_date_swapchain)
     {
         on_resize();
@@ -242,13 +222,13 @@ void Renderer::update()
 
     gfx::GraphicsWork cmd = device.get_graphics_work(work_pool);
 
-    // wait_for previous work to complete, NOT BLOCKING!
-    // previous wait_for was waiting because we are waiting on the device,
-    // here the wait_for is in a command buffer, so on the gpu
-    cmd.wait_for(image_acquired, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    // vulkan hack: this command buffer will wait for the image acquire semaphore
+    cmd.wait_for_acquired(*context.surface, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
     if (frame_count == 0)
     {
-        cmd.wait_for(transfer_done, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        cmd.wait_for(transfer_done, transfer_fence_value+1, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        transfer_fence_value += 1;
     }
 
     // do random stuff
@@ -319,11 +299,13 @@ void Renderer::update()
         cmd.end();
     }
 
-    // submit signals a fence and semaphore
-    rendering_done = device.submit(cmd, &rendering_done);
+    // vulkan hack: hint the device to submit a semaphore to wait on before presenting
+    cmd.prepare_present(*context.surface);
+
+    device.submit(cmd, {fence}, {frame_count+1});
 
     // present will wait for semaphore
-    out_of_date_swapchain = device.present(rendering_done, *context.surface, gfx::WorkPool::POOL_TYPE_GRAPHICS);
+    out_of_date_swapchain = device.present(*context.surface, gfx::WorkPool::POOL_TYPE_GRAPHICS);
     if (out_of_date_swapchain)
     {
         on_resize();

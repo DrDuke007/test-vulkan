@@ -83,11 +83,11 @@ struct Device
 #undef X
 
     // Resources
-    Receipt signaled_receipt();
     void create_work_pool(WorkPool &work_pool);
     void reset_work_pool(WorkPool &work_pool);
     void destroy_work_pool(WorkPool &work_pool);
-    void destroy_receipt(Receipt &receipt);
+    Fence create_fence(u64 initial_value = 0);
+    void destroy_fence(Fence &fence);
 
     Handle<Shader> create_shader(std::string_view path);
     void destroy_shader(Handle<Shader> shader_handle);
@@ -123,13 +123,13 @@ struct Device
     ComputeWork  get_compute_work (WorkPool &work_pool);
     TransferWork get_transfer_work(WorkPool &work_pool);
 
-    void wait_for(Receipt &receipt);
+    void wait_for(Fence &fence, u64 wait_value);
     void wait_idle();
-    Receipt submit(Work &work, Receipt *reuse_receipt = nullptr);
+    void submit(Work &work, const Vec<Fence> &signal_fences, const Vec<u64> &signal_values);
 
     // Swapchain
-    std::pair<Receipt, bool> acquire_next_swapchain(Surface &surface, Receipt *reuse_receipt = nullptr);
-    bool present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool_type);
+    bool acquire_next_swapchain(Surface &surface);
+    bool present(Surface &surface, WorkPool::POOL_TYPE pool_type);
 };
 
 }

@@ -23,10 +23,22 @@ void Work::end()
     VK_CHECK(vkEndCommandBuffer(command_buffer));
 }
 
-void Work::wait_for(Receipt previous_work, VkPipelineStageFlags stage_dst)
+void Work::wait_for(Fence &fence, u64 wait_value, VkPipelineStageFlags stage_dst)
 {
-    wait_list.push_back(previous_work);
+    wait_fence_list.push_back(fence);
+    wait_value_list.push_back(wait_value);
     wait_stage_list.push_back(stage_dst);
+}
+
+void Work::wait_for_acquired(Surface &surface, VkPipelineStageFlags stage_dst)
+{
+    image_acquired_semaphore = surface.image_acquired_semaphores[surface.previous_image];
+    image_acquired_stage = stage_dst;
+}
+
+void Work::prepare_present(Surface &surface)
+{
+    signal_present_semaphore = surface.can_present_semaphores[surface.current_image];
 }
 
 void Work::barrier(Handle<Image> image_handle, ImageUsage usage_destination)
@@ -306,81 +318,89 @@ TransferWork Device::get_transfer_work(WorkPool &work_pool)
     return {{create_work(*this, work_pool, WorkPool::POOL_TYPE_TRANSFER)}};
 }
 
-// Receipt
-Receipt Device::signaled_receipt()
+// Fences
+Fence Device::create_fence(u64 initial_value)
 {
-    Receipt receipt = {};
-    VkFenceCreateInfo fci = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    fci.flags             = VK_FENCE_CREATE_SIGNALED_BIT;
-    VK_CHECK(vkCreateFence(device, &fci, nullptr, &receipt.fence));
-    receipt.fence_reset = false;
-    return receipt;
+    Fence fence = {};
+    VkSemaphoreTypeCreateInfo timeline_info =  {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
+    timeline_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    timeline_info.initialValue = initial_value;
+
+    VkSemaphoreCreateInfo semaphore_info = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    semaphore_info.pNext = &timeline_info;
+
+    VK_CHECK(vkCreateSemaphore(device, &semaphore_info, nullptr, &fence.timeline_semaphore));
+
+    return fence;
 }
 
-void Device::destroy_receipt(Receipt &receipt)
+void Device::destroy_fence(Fence &fence)
 {
-    vkDestroyFence(device, receipt.fence, nullptr);
-    vkDestroySemaphore(device, receipt.semaphore, nullptr);
-    receipt.fence = VK_NULL_HANDLE;
-    receipt.semaphore = VK_NULL_HANDLE;
+    vkDestroySemaphore(device, fence.timeline_semaphore, nullptr);
+    fence.timeline_semaphore = VK_NULL_HANDLE;
 }
 
 // Submission
-Receipt Device::submit(Work &work, Receipt *reuse_receipt)
+void Device::submit(Work &work, const Vec<Fence> &signal_fences, const Vec<u64> &signal_values)
 {
-    // Create the receipt
-    Receipt receipt = {};
-    if (reuse_receipt)
-    {
-        receipt = *reuse_receipt;
-    }
-
-    if (receipt.fence == VK_NULL_HANDLE)
-    {
-        VkFenceCreateInfo fence_info = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-        VK_CHECK(vkCreateFence(device, &fence_info, nullptr, &receipt.fence));
-    }
-
-    if (receipt.semaphore == VK_NULL_HANDLE)
-    {
-        VkSemaphoreCreateInfo semaphore_info = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        VK_CHECK(vkCreateSemaphore(device, &semaphore_info, nullptr, &receipt.semaphore));
-    }
-
     // Creathe list of semaphores to wait
-    Vec<VkSemaphore> wait_list;
-    wait_list.reserve(wait_list.size());
-    for (const auto &wait : work.wait_list)
+    Vec<VkSemaphore> signal_list;
+    signal_list.reserve(signal_fences.size() + 1);
+    Vec<u64> local_signal_values = signal_values;
+    for (const auto &fence : signal_fences)
     {
-        if (wait.semaphore != VK_NULL_HANDLE)
-        {
-            wait_list.push_back(wait.semaphore);
-        }
+        signal_list.push_back(fence.timeline_semaphore);
     }
 
-    //TODO: check if needed
-    if (receipt.fence_reset == false) {
-        vkResetFences(device, 1, &receipt.fence);
-        receipt.fence_reset = true;
+    if (work.signal_present_semaphore)
+    {
+        signal_list.push_back(work.signal_present_semaphore.value());
+        local_signal_values.push_back(0);
     }
+
+    Vec<VkSemaphore> semaphore_list;
+    Vec<u64> value_list;
+    Vec<VkPipelineStageFlags> stage_list;
+
+    semaphore_list.reserve(work.wait_fence_list.size() + 1);
+    value_list.reserve(work.wait_fence_list.size() + 1);
+    stage_list.reserve(work.wait_fence_list.size() + 1);
+
+    for (uint i = 0; i < work.wait_fence_list.size(); i++)
+    {
+        semaphore_list.push_back(work.wait_fence_list[i].timeline_semaphore);
+        value_list.push_back(work.wait_value_list[i]);
+        stage_list.push_back(work.wait_stage_list[i]);
+    }
+
+    // vulkan hacks
+    if (work.image_acquired_semaphore)
+    {
+        semaphore_list.push_back(work.image_acquired_semaphore.value());
+        value_list.push_back(0);
+        stage_list.push_back(work.image_acquired_stage.value());
+    }
+
+    VkTimelineSemaphoreSubmitInfo timeline_info = {.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+    timeline_info.waitSemaphoreValueCount = value_list.size();
+    timeline_info.pWaitSemaphoreValues = value_list.data();
+    timeline_info.signalSemaphoreValueCount = local_signal_values.size();
+    timeline_info.pSignalSemaphoreValues = local_signal_values.data();
 
     VkSubmitInfo submit_info            = {.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    submit_info.waitSemaphoreCount      = wait_list.size();
-    submit_info.pWaitSemaphores         = wait_list.data();
-    submit_info.pWaitDstStageMask       = work.wait_stage_list.data();
+    submit_info.pNext                   = &timeline_info;
+    submit_info.waitSemaphoreCount      = semaphore_list.size();
+    submit_info.pWaitSemaphores         = semaphore_list.data();
+    submit_info.pWaitDstStageMask       = stage_list.data();
     submit_info.commandBufferCount      = 1;
     submit_info.pCommandBuffers         = &work.command_buffer;
-    submit_info.signalSemaphoreCount    = 1;
-    submit_info.pSignalSemaphores       = &receipt.semaphore;
+    submit_info.signalSemaphoreCount    = signal_list.size();
+    submit_info.pSignalSemaphores       = signal_list.data();
 
-    VK_CHECK(vkQueueSubmit(work.queue, 1, &submit_info, receipt.fence));
-
-    receipt.fence_reset = false;
-
-    return receipt;
+    VK_CHECK(vkQueueSubmit(work.queue, 1, &submit_info, VK_NULL_HANDLE));
 }
 
-bool Device::present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool_type)
+bool Device::present(Surface &surface, WorkPool::POOL_TYPE pool_type)
 {
     u32 queue_family_idx =
           pool_type == WorkPool::POOL_TYPE_GRAPHICS ? this->graphics_family_idx
@@ -392,7 +412,7 @@ bool Device::present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool
 
     VkPresentInfoKHR present_i   = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present_i.waitSemaphoreCount = 1;
-    present_i.pWaitSemaphores    = &receipt.semaphore;
+    present_i.pWaitSemaphores    = &surface.can_present_semaphores[surface.current_image];
     present_i.swapchainCount     = 1;
     present_i.pSwapchains        = &surface.swapchain;
     present_i.pImageIndices      = &surface.current_image;
@@ -414,24 +434,15 @@ bool Device::present(Receipt receipt, Surface &surface, WorkPool::POOL_TYPE pool
     return false;
 }
 
-void Device::wait_for(Receipt &receipt)
+void Device::wait_for(Fence &fence, u64 wait_value)
 {
-    assert(receipt.fence != VK_NULL_HANDLE);
-    assert(receipt.fence_reset == false);
-
     // 10 sec in nanoseconds
     u64 timeout = 10llu*1000llu*1000llu*1000llu;
-    auto wait_result = vkWaitForFences(device, 1, &receipt.fence, true, timeout);
-    if (wait_result == VK_TIMEOUT)
-    {
-        throw std::runtime_error("Submitted command buffer more than 10 second ago.");
-    }
-    VK_CHECK(wait_result);
-
-    // reset the fence for future use
-    VK_CHECK(vkResetFences(device, 1, &receipt.fence));
-
-    receipt.fence_reset = true;
+    VkSemaphoreWaitInfo wait_info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO };
+    wait_info.semaphoreCount = 1;
+    wait_info.pSemaphores = &fence.timeline_semaphore;
+    wait_info.pValues = &wait_value;
+    VK_CHECK(vkWaitSemaphores(device, &wait_info, timeout));
 }
 
 void Device::wait_idle()
@@ -439,26 +450,17 @@ void Device::wait_idle()
     VK_CHECK(vkDeviceWaitIdle(device));
 }
 
-std::pair<Receipt, bool> Device::acquire_next_swapchain(Surface &surface, Receipt *reuse_receipt)
+bool Device::acquire_next_swapchain(Surface &surface)
 {
     bool error = false;
 
-    Receipt receipt = {};
-    if (reuse_receipt)
-    {
-        receipt = *reuse_receipt;
-    }
-    if (receipt.semaphore == VK_NULL_HANDLE)
-    {
-        VkSemaphoreCreateInfo semaphore_info = {.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        VK_CHECK(vkCreateSemaphore(device, &semaphore_info, nullptr, &receipt.semaphore));
-    }
+    surface.previous_image = surface.current_image;
 
     auto res = vkAcquireNextImageKHR(
         device,
         surface.swapchain,
         std::numeric_limits<uint64_t>::max(),
-        receipt.semaphore,
+        surface.image_acquired_semaphores[surface.current_image],
         nullptr,
         &surface.current_image);
 
@@ -471,6 +473,6 @@ std::pair<Receipt, bool> Device::acquire_next_swapchain(Surface &surface, Receip
         VK_CHECK(res);
     }
 
-    return {receipt, error};
+    return error;
 }
 }
