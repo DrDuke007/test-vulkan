@@ -26,6 +26,7 @@ struct DynamicDescriptor
 {
     Handle<Buffer> buffer_handle;
     usize offset;
+    usize size;
 };
 
 struct DescriptorType
@@ -72,12 +73,16 @@ struct DescriptorSet
     // linear map
     Vec<VkDescriptorSet> vkhandles;
     Vec<usize> hashes;
+
+    // dynamic offsets
+    Vec<usize> dynamic_descriptors;
+    Vec<usize> dynamic_offsets;
 };
 
 DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphics_state);
 void destroy_descriptor_set(Device &device, DescriptorSet &set);
 
-void bind_uniform_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle, usize offset);
+void bind_uniform_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size);
 void bind_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle);
 void bind_image(DescriptorSet &set, u32 slot, Handle<Image> image_handle);
 VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set);

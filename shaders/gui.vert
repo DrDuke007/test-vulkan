@@ -1,4 +1,5 @@
 #extension GL_ARB_shader_draw_parameters : require
+#extension GL_EXT_buffer_reference : require
 
 #include "types.h"
 
@@ -14,9 +15,14 @@ layout(set = 0, binding = 0) buffer readonly Vertices {
     ImGuiVertex vertices[];
 };
 
-layout(set = 0, binding = 1) buffer readonly Options {
+layout(buffer_reference, std430, buffer_reference_align = 16) buffer VerticesType {
+    ImGuiVertex vertices[];
+};
+
+layout(set = 0, binding = 1) uniform Options {
     float2 scale;
     float2 translation;
+    VerticesType vertices_ptr;
 };
 
 layout(location = 0) out float2 o_uv;

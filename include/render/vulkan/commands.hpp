@@ -155,7 +155,9 @@ struct ComputeWork : TransferWork
     void dispatch();
     void bind_pipeline(Handle<ComputeProgram> program_handle);
 
+
     void bind_buffer(Handle<GraphicsProgram> program_handle, uint slot, Handle<Buffer> buffer_handle);
+    void bind_uniform_buffer(Handle<GraphicsProgram> program_handle, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size);
     void bind_image(Handle<GraphicsProgram> program_handle, uint slot, Handle<Image> image_handle);
 };
 

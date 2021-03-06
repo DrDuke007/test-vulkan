@@ -108,6 +108,7 @@ struct Device
 
     Handle<Buffer> create_buffer(const BufferDescription &buffer_desc);
     void *map_buffer(Handle<Buffer> buffer_handle);
+    u64 get_buffer_address(Handle<Buffer> buffer_handle);
 
     template<typename T>
     inline T *map_buffer(Handle<Buffer> buffer_handle) { return reinterpret_cast<T*>(map_buffer(buffer_handle)); }

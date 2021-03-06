@@ -13,7 +13,7 @@
         assert(false);                                                                                                 \
     }
 
-#define PACKED
+#define PACKED __attribute__((packed))
 #define UNUSED(x) (void)(x)
 
 

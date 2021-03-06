@@ -16,8 +16,10 @@ DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphic
     Vec<VkDescriptorSetLayoutBinding> bindings;
 
     uint binding_number = 0;
-    for (const auto &descriptor_type : graphics_state.descriptors)
+    for (usize i_descriptor = 0; i_descriptor < graphics_state.descriptors.size(); i_descriptor++)
     {
+        auto &descriptor_type = graphics_state.descriptors[i_descriptor];
+
         bindings.emplace_back();
         auto &binding = bindings.back();
         binding.binding = binding_number;
@@ -25,7 +27,14 @@ DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphic
         binding.descriptorCount = descriptor_type.count ? descriptor_type.count : 1;
         binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         binding_number += 1;
+
+        if (descriptor_type.type == DescriptorType::DynamicBuffer)
+        {
+            descriptor_set.dynamic_descriptors.push_back(i_descriptor);
+        }
     }
+
+    descriptor_set.dynamic_offsets.resize(descriptor_set.dynamic_descriptors.size());
 
     Descriptor empty = {{{}}};
     descriptor_set.descriptors.resize(graphics_state.descriptors.size(), empty);
@@ -59,10 +68,22 @@ void bind_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle)
     set.descriptors[slot].buffer = {buffer_handle};
 }
 
-void bind_uniform_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle, usize offset)
+void bind_uniform_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size)
 {
     assert(set.descriptor_desc[slot].type == DescriptorType::DynamicBuffer);
-    set.descriptors[slot].dynamic = {buffer_handle, offset};
+    set.descriptors[slot].dynamic = {buffer_handle, offset, size};
+
+    for (usize i_dynamic = 0; i_dynamic < set.dynamic_descriptors.size(); i_dynamic++)
+    {
+        auto dynamic_descriptor_idx = set.dynamic_descriptors[i_dynamic];
+        if (slot == dynamic_descriptor_idx)
+        {
+            set.dynamic_offsets[i_dynamic] = offset;
+            return;
+        }
+    }
+
+    log::error("Descriptor #{} is not a dynamic buffer.\n", slot);
 }
 
 VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set)
@@ -128,6 +149,20 @@ VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 });
             writes[slot].pImageInfo = &images_info.back();
+        }
+        else if (set.descriptor_desc[slot].type == DescriptorType::DynamicBuffer)
+        {
+            DynamicDescriptor &dynamic_descriptor = set.descriptors[slot].dynamic;
+            if (!dynamic_descriptor.buffer_handle.is_valid())
+                log::error("Binding #{} has an invalid buffer handle.\n", slot);
+
+            auto &buffer = *device.buffers.get(dynamic_descriptor.buffer_handle);
+            buffers_info.push_back({
+                    .buffer = buffer.vkhandle,
+                    .offset = 0,
+                    .range = dynamic_descriptor.size,
+                });
+            writes[slot].pBufferInfo = &buffers_info.back();
         }
         else
         {

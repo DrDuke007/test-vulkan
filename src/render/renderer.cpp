@@ -10,6 +10,13 @@
 #include <tuple> // for std::tie
 #include <imgui/imgui.h>
 
+struct PACKED ImguiOptions
+{
+    float2 scale;
+    float2 translation;
+    u64 vertices_pointer;
+};
+
 Renderer Renderer::create(const platform::Window *window)
 {
     Renderer renderer = {
@@ -32,7 +39,7 @@ Renderer Renderer::create(const platform::Window *window)
     // gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
     gui_state.descriptors = {
         {.type = gfx::DescriptorType::StorageBuffer, .count = 1},
-        {.type = gfx::DescriptorType::StorageBuffer, .count = 1},
+        {.type = gfx::DescriptorType::DynamicBuffer, .count = 1},
         {.type = gfx::DescriptorType::SampledImage,  .count = 1},
     };
 
@@ -99,8 +106,8 @@ Renderer Renderer::create(const platform::Window *window)
 
     renderer.gui_options = device.create_buffer({
             .name = "Imgui options",
-            .size = 1_KiB,
-            .usage = gfx::storage_buffer_usage,
+            .size = sizeof(ImguiOptions),
+            .usage = gfx::uniform_buffer_usage,
             .memory_usage = VMA_MEMORY_USAGE_CPU_TO_GPU,
         });
 
@@ -195,12 +202,10 @@ void Renderer::update()
         indices  += cmd_list.IdxBuffer.Size;
     }
 
-    auto *options = device.map_buffer<float>(gui_options);
-    std::memset(vertices, 0, 1_KiB);
-    options[0] = 2.0f / data->DisplaySize.x; // X Scale
-    options[1] = 2.0f / data->DisplaySize.y; // Y Scale
-    options[2] = -1.0f - data->DisplayPos.x * options[0]; // X Translation
-    options[3] = -1.0f - data->DisplayPos.y * options[1]; // Y Translation
+    auto *options = device.map_buffer<ImguiOptions>(gui_options);
+    options->scale = float2(2.0f / data->DisplaySize.x, 2.0f / data->DisplaySize.y);
+    options->translation = float2(-1.0f - data->DisplayPos.x * options->scale.x, -1.0f - data->DisplayPos.y * options->scale.y);
+    options->vertices_pointer = device.get_buffer_address(gui_vertices);
 
     if (frame_count == 0)
     {
@@ -243,7 +248,7 @@ void Renderer::update()
         cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
 
         cmd.bind_buffer(gui_program, 0, gui_vertices);
-        cmd.bind_buffer(gui_program, 1, gui_options);
+        cmd.bind_uniform_buffer(gui_program, 1, gui_options, 0, 4 * sizeof(float));
         cmd.bind_image(gui_program, 2, gui_font_atlas);
         cmd.bind_pipeline(gui_program, 0);
         cmd.bind_index_buffer(gui_indices);

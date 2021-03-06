@@ -159,6 +159,12 @@ void ComputeWork::bind_buffer(Handle<GraphicsProgram> program_handle, uint slot,
     ::vulkan::bind_buffer(program.descriptor_set, slot, buffer_handle);
 }
 
+void ComputeWork::bind_uniform_buffer(Handle<GraphicsProgram> program_handle, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size)
+{
+    auto &program = *device->graphics_programs.get(program_handle);
+    ::vulkan::bind_uniform_buffer(program.descriptor_set, slot, buffer_handle, offset, size);
+}
+
 void ComputeWork::bind_image(Handle<GraphicsProgram> program_handle, uint slot, Handle<Image> image_handle)
 {
     auto &program = *device->graphics_programs.get(program_handle);
@@ -224,7 +230,9 @@ void GraphicsWork::bind_pipeline(Handle<GraphicsProgram> program_handle, uint pi
         find_or_create_descriptor_set(*device, program.descriptor_set)
     };
 
-    Vec<u32> offsets = {};
+    Vec<u32> offsets;
+    offsets.reserve(program.descriptor_set.dynamic_offsets.size());
+    offsets.insert(offsets.end(), program.descriptor_set.dynamic_offsets.begin(), program.descriptor_set.dynamic_offsets.end());
 
     vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program.pipeline_layout, 0, sets.size(), sets.data(), offsets.size(), offsets.data());
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -260,7 +268,9 @@ void Device::reset_work_pool(WorkPool &work_pool)
 {
     for (auto &command_pool : work_pool.command_pools)
     {
-        vkFreeCommandBuffers(this->device, command_pool.vk_handle, command_pool.free_list.size(), command_pool.free_list.data());
+        if (!command_pool.free_list.empty()) {
+            vkFreeCommandBuffers(this->device, command_pool.vk_handle, command_pool.free_list.size(), command_pool.free_list.data());
+        }
         command_pool.free_list.clear();
 
         VK_CHECK(vkResetCommandPool(this->device, command_pool.vk_handle, 0));

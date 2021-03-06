@@ -116,13 +116,24 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
 
     VK_CHECK(vkCreateDevice(device.physical_device, &dci, nullptr, &device.device));
 
+    // Warnings
+    if (!device.vulkan12_features.timelineSemaphore)
+    {
+        log::error("This device does not support timeline semaphores from Vulkan 1.2");
+    }
+
+    if (!device.vulkan12_features.bufferDeviceAddress)
+    {
+        log::error("This device does not support buffer device address from Vulkan 1.2");
+    }
+
     /// --- Init VMA allocator
     VmaAllocatorCreateInfo allocator_info = {};
     allocator_info.vulkanApiVersion       = VK_API_VERSION_1_2;
     allocator_info.physicalDevice         = device.physical_device;
     allocator_info.device                 = device.device;
     allocator_info.instance               = context.instance;
-    allocator_info.flags                  = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+    allocator_info.flags                  = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT | VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     VK_CHECK(vmaCreateAllocator(&allocator_info, &device.allocator));
 
     /// --- Descriptor sets pool

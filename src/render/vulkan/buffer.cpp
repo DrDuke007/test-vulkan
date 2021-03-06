@@ -38,10 +38,19 @@ Handle<Buffer> Device::create_buffer(const BufferDescription &buffer_desc)
         VK_CHECK(vkSetDebugUtilsObjectNameEXT(device, &name_info));
     }
 
+    u64  gpu_address = 0;
+    if (buffer_desc.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+    {
+        VkBufferDeviceAddressInfo address_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+        address_info.buffer = vkhandle;
+        gpu_address = vkGetBufferDeviceAddress(device, &address_info);
+    }
+
     return buffers.add({
             .desc = buffer_desc,
             .vkhandle = vkhandle,
             .allocation = allocation,
+            .gpu_address = gpu_address,
         });
 }
 
@@ -70,6 +79,12 @@ void *Device::map_buffer(Handle<Buffer> buffer_handle)
     }
 
     return buffer.mapped;
+}
+
+u64 Device::get_buffer_address(Handle<Buffer> buffer_handle)
+{
+    auto &buffer = *buffers.get(buffer_handle);
+    return buffer.gpu_address;
 }
 
 void Device::flush_buffer(Handle<Buffer> buffer_handle)
