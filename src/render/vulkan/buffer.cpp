@@ -84,6 +84,11 @@ void *Device::map_buffer(Handle<Buffer> buffer_handle)
 u64 Device::get_buffer_address(Handle<Buffer> buffer_handle)
 {
     auto &buffer = *buffers.get(buffer_handle);
+
+        VkBufferDeviceAddressInfo address_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+        address_info.buffer = buffer.vkhandle;
+        buffer.gpu_address = vkGetBufferDeviceAddress(device, &address_info);
+
     return buffer.gpu_address;
 }
 

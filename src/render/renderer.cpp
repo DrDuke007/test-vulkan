@@ -38,7 +38,6 @@ Renderer Renderer::create(const platform::Window *window)
     gui_state.attachments.colors.push_back({.format = surface.format.format});
     // gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
     gui_state.descriptors = {
-        {.type = gfx::DescriptorType::StorageBuffer, .count = 1},
         {.type = gfx::DescriptorType::DynamicBuffer, .count = 1},
         {.type = gfx::DescriptorType::SampledImage,  .count = 1},
     };
@@ -247,9 +246,8 @@ void Renderer::update()
 
         cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
 
-        cmd.bind_buffer(gui_program, 0, gui_vertices);
-        cmd.bind_uniform_buffer(gui_program, 1, gui_options, 0, 4 * sizeof(float));
-        cmd.bind_image(gui_program, 2, gui_font_atlas);
+        cmd.bind_uniform_buffer(gui_program, 0, gui_options, 0, sizeof(ImguiOptions));
+        cmd.bind_image(gui_program, 1, gui_font_atlas);
         cmd.bind_pipeline(gui_program, 0);
         cmd.bind_index_buffer(gui_indices);
 

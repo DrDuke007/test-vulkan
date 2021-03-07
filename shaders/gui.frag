@@ -1,6 +1,6 @@
 #include "types.h"
 
-layout(set = 0, binding = 2) uniform sampler2D font_atlas;
+layout(set = 0, binding = 1) uniform sampler2D font_atlas;
 
 layout(location = 0) in float2 i_uv;
 layout(location = 1) in float4 i_color;

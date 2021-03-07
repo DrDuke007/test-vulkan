@@ -67,15 +67,8 @@ Context Context::create(bool enable_validation, const platform::Window *window)
     app_info.engineVersion      = VK_MAKE_VERSION(1, 1, 0);
     app_info.apiVersion         = VK_API_VERSION_1_2;
 
-    // TODO: add synchronization once the flag is available in vulkan_core.h
-    std::array<VkValidationFeatureEnableEXT, 1> enables{VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT};
-
-    VkValidationFeaturesEXT features       = {.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT};
-    features.enabledValidationFeatureCount = enables.size();
-    features.pEnabledValidationFeatures    = enables.data();
-
     VkInstanceCreateInfo create_info    = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
-    create_info.pNext                   = &features;
+    create_info.pNext                   = nullptr;
     create_info.flags                   = 0;
     create_info.pApplicationInfo        = &app_info;
     create_info.enabledLayerCount       = static_cast<uint32_t>(instance_layers.size());
