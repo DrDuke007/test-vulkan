@@ -9,91 +9,14 @@
 
 namespace vulkan
 {
-/** Send resources to other queues - Async compute example
-
-GraphicsWork cmd = device.get_graphics();
-cmd.begin();
-cmd.barrier(hdr_buffer, ColorAttachment);
-cmd.barrier(depth_buffer, DepthBuffer);
-cmd.begin_pass(hdr_buffer, depth_buffer);
-cmd.bind_pipeline(simple_pass);
-cmd.draw();
-cmd.draw();
-cmd.draw();
-cmd.draw();
-cmd.end_pass();
-cmd.barrier(depth_buffer, SampledImage);
-cmd.dispatch(depth_reduction);
-cmd.barrier(gui_offscreen, ColorAttachment);
-cmd.begin_pass(gui_offscreen);
-cmd.bind_pipeline(gui);
-cmd.draw();
-cmd.draw();
-cmd.end_pass();
-
-auto hdr_transfer = cmd.send_to(compute, hdr_buffer);
-auto gui_transfer = cmd.send_to(compute, gui_offscreen);
-cmd.end();
-auto done = device.submit(cmd);
-submit will signal a fence and a semaphore
-
-//  creating a work with a receipt means wait for this semaphore when submitting
-ComputeWork compute = device.get_compute(done);
-compute.receive(hdr_transfer);
-compute.receive(gui_transfer);
-compute.begin();
-compute.barrier(hdr_buffer, SampledImage);
-compute.barrier(gui_offscreen, SampledImage);
-compute.bind_pipeline(post_process);
-compute.dispatch();
-compute.end();
-
-device.submit(compute);
-**/
-
-/** Wait for completion
-TransferWork cmd;
-cmd.begin();
-cmd.upload(font_atlas, pixels, size);
-cmd.end();
-
-auto done = device.submit(cmd);
-// wait for fence
-device.wait_for(done);
-**/
-
-/** Swapchain
-
-auto last_frame_done = ... ;
-device.wait_for(last_frame_done);
-
-auto image_acquired = device.acquire_next_swapchain();
-
-GraphicsWork cmd{image_acquired};
-cmd.begin();
-... stuff ...
-cmd.end();
-auto done = device.submit(cmd);
-device.present(done);
-
-last_frame_done = done;
-**/
-
-/** Semaphores/Fences
-
-acquire_next_image() -> Semaphore
-submit               -> Semaphore/Fence
-
-Semaphore -> present
-Semaphore -> cmd.wait_for
-Fence     -> device.wait_for
-
- **/
 struct Device;
 struct Image;
 struct Surface;
 
 // A request to send a resource to another queue
+// TODO:
+// ResourceTransfer t = cmd1.send_to(image1, cmd2);
+// cmd1.receive(t);
 struct ResourceTransfer
 {
     int sender;
@@ -101,12 +24,12 @@ struct ResourceTransfer
     int resource;
 };
 
+// DX12-like fence used for CPU/CPU, CPU/GPU, or GPU/GPU synchronization
 struct Fence
 {
     VkSemaphore timeline_semaphore = VK_NULL_HANDLE;
     u64 value = 0;
 };
-
 
 // Command buffer / Queue abstraction
 struct Work
@@ -127,8 +50,10 @@ struct Work
     void begin();
     void end();
 
+    // TODO:
     ResourceTransfer send_to(int receiver, int resource);
     void receive(ResourceTransfer transfer);
+
     void wait_for(Fence &fence, u64 wait_value, VkPipelineStageFlags stage_dst);
 
     // vulkan hacks:
@@ -156,7 +81,6 @@ struct ComputeWork : TransferWork
     void bind_pipeline(Handle<ComputeProgram> program_handle);
 
 
-    void bind_buffer(Handle<GraphicsProgram> program_handle, uint slot, Handle<Buffer> buffer_handle);
     void bind_uniform_buffer(Handle<GraphicsProgram> program_handle, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size);
     void bind_image(Handle<GraphicsProgram> program_handle, uint slot, Handle<Image> image_handle);
 };

@@ -153,12 +153,6 @@ void ComputeWork::clear_image(Handle<Image> image_handle, VkClearColorValue clea
     vkCmdClearColorImage(command_buffer, image.vkhandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1, &image.full_range);
 }
 
-void ComputeWork::bind_buffer(Handle<GraphicsProgram> program_handle, uint slot, Handle<Buffer> buffer_handle)
-{
-    auto &program = *device->graphics_programs.get(program_handle);
-    ::vulkan::bind_buffer(program.descriptor_set, slot, buffer_handle);
-}
-
 void ComputeWork::bind_uniform_buffer(Handle<GraphicsProgram> program_handle, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size)
 {
     auto &program = *device->graphics_programs.get(program_handle);

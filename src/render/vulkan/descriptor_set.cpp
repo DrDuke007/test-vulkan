@@ -62,12 +62,6 @@ void bind_image(DescriptorSet &set, u32 slot, Handle<Image> image_handle)
     set.descriptors[slot].image = {image_handle};
 }
 
-void bind_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle)
-{
-    assert(set.descriptor_desc[slot].type == DescriptorType::StorageBuffer);
-    set.descriptors[slot].buffer = {buffer_handle};
-}
-
 void bind_uniform_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size)
 {
     assert(set.descriptor_desc[slot].type == DescriptorType::DynamicBuffer);
@@ -124,20 +118,7 @@ VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set
         writes[slot].descriptorCount  = set.descriptor_desc[slot].count;
         writes[slot].descriptorType   = to_vk(set.descriptor_desc[slot]);
 
-        if (set.descriptor_desc[slot].type == DescriptorType::StorageBuffer)
-        {
-            if (!set.descriptors[slot].buffer.buffer_handle.is_valid())
-                log::error("Binding #{} has an invalid buffer handle.\n", slot);
-
-            auto &buffer = *device.buffers.get(set.descriptors[slot].buffer.buffer_handle);
-            buffers_info.push_back({
-                    .buffer = buffer.vkhandle,
-                    .offset = 0,
-                    .range = buffer.desc.size,
-                });
-            writes[slot].pBufferInfo = &buffers_info.back();
-        }
-        else if (set.descriptor_desc[slot].type == DescriptorType::SampledImage)
+        if (set.descriptor_desc[slot].type == DescriptorType::SampledImage)
         {
             if (!set.descriptors[slot].image.image_handle.is_valid())
                 log::error("Binding #{} has an invalid image handle.\n", slot);

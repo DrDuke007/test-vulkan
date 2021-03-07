@@ -452,7 +452,6 @@ static inline VkDescriptorType to_vk(DescriptorType type)
     {
     case DescriptorType::SampledImage: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     case DescriptorType::StorageImage: return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    case DescriptorType::StorageBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     case DescriptorType::DynamicBuffer: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     }
     return VK_DESCRIPTOR_TYPE_MAX_ENUM;
