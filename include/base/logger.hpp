@@ -2,7 +2,7 @@
 #include <fmt/core.h>
 #include <fmt/color.h>
 
-namespace log
+namespace logger
 {
     template <typename S, typename... Args>
     inline void info(const S& format_str, Args&&... args)

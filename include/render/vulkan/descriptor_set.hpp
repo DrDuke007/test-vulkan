@@ -50,7 +50,7 @@ struct Descriptor
         DynamicDescriptor dynamic;
 
         // for std::hash
-        struct U {
+        struct {
             u64 one;
             u64 two;
             u64 three;

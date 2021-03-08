@@ -1,7 +1,7 @@
 #include "render/vulkan/device.hpp"
 
 #include "base/types.hpp"
-#include "base/log.hpp"
+#include "base/logger.hpp"
 
 #include "render/vulkan/utils.hpp"
 #include "render/vulkan/context.hpp"
@@ -99,7 +99,7 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
         || device.compute_family_idx == u32_invalid
         || device.transfer_family_idx == u32_invalid)
     {
-        log::error("Failed to find a graphics, compute and transfer queue.\n");
+        logger::error("Failed to find a graphics, compute and transfer queue.\n");
         // throw std::runtime_error("Failed to find a graphics, compute and transfer queue.");
     }
 
@@ -119,12 +119,12 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
     // Warnings
     if (!device.vulkan12_features.timelineSemaphore)
     {
-        log::error("This device does not support timeline semaphores from Vulkan 1.2");
+        logger::error("This device does not support timeline semaphores from Vulkan 1.2");
     }
 
     if (!device.vulkan12_features.bufferDeviceAddress)
     {
-        log::error("This device does not support buffer device address from Vulkan 1.2");
+        logger::error("This device does not support buffer device address from Vulkan 1.2");
     }
 
     /// --- Init VMA allocator

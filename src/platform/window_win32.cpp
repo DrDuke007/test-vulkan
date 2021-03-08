@@ -1,7 +1,7 @@
 #include "platform/window.hpp"
 
 #include "base/algorithms.hpp"
-#include "base/log.hpp"
+#include "base/logger.hpp"
 
 #include <cassert>
 #include <stdexcept>
@@ -322,7 +322,7 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
                 state = ButtonState::Released;
             }
 
-            log::info("{} {}\n", to_string(state), to_string(key));
+            logger::info("{} {}\n", to_string(state), to_string(key));
 
             window.push_event<event::Key>({.key = key, .state = state});
             window.keys_pressed[to_underlying(key)] = state == ButtonState::Pressed;

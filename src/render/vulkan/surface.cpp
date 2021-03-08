@@ -43,7 +43,7 @@ void Surface::create_swapchain(Device &device)
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device.physical_device, this->surface, &capabilities));
     this->extent = capabilities.currentExtent;
 
-    log::info("Creating swapchain {}x{}\n", this->extent.width, this->extent.height);
+    logger::info("Creating swapchain {}x{}\n", this->extent.width, this->extent.height);
 
     // Find a good present mode (by priority Mailbox then Immediate then FIFO)
     uint present_modes_count = 0;

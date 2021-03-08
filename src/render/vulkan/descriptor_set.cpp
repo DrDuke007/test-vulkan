@@ -77,7 +77,7 @@ void bind_uniform_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_han
         }
     }
 
-    log::error("Descriptor #{} is not a dynamic buffer.\n", slot);
+    logger::error("Descriptor #{} is not a dynamic buffer.\n", slot);
 }
 
 VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set)
@@ -121,7 +121,7 @@ VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set
         if (set.descriptor_desc[slot].type == DescriptorType::SampledImage)
         {
             if (!set.descriptors[slot].image.image_handle.is_valid())
-                log::error("Binding #{} has an invalid image handle.\n", slot);
+                logger::error("Binding #{} has an invalid image handle.\n", slot);
 
             auto &image = *device.images.get(set.descriptors[slot].image.image_handle);
             images_info.push_back({
@@ -135,7 +135,7 @@ VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set
         {
             DynamicDescriptor &dynamic_descriptor = set.descriptors[slot].dynamic;
             if (!dynamic_descriptor.buffer_handle.is_valid())
-                log::error("Binding #{} has an invalid buffer handle.\n", slot);
+                logger::error("Binding #{} has an invalid buffer handle.\n", slot);
 
             auto &buffer = *device.buffers.get(dynamic_descriptor.buffer_handle);
             buffers_info.push_back({
@@ -147,7 +147,7 @@ VkDescriptorSet find_or_create_descriptor_set(Device &device, DescriptorSet &set
         }
         else
         {
-            log::error("Binding #{} has an invalid descriptor type.\n", slot);
+            logger::error("Binding #{} has an invalid descriptor type.\n", slot);
         }
     }
 

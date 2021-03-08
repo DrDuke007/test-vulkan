@@ -1,7 +1,7 @@
 #pragma once
 #include "base/types.hpp"
 #include "base/vector.hpp"
-#include "base/log.hpp"
+#include "base/logger.hpp"
 
 #include "render/vulkan/resources.hpp"
 #include "vulkan/vulkan_core.h"
@@ -65,7 +65,7 @@ inline const char *vkres_to_str(VkResult code)
         if (err)                                                                                                       \
         {                                                                                                              \
             const char *err_msg = vkres_to_str(err);                                                                   \
-            log::error("Vulkan function returned {}\n", err_msg);    \
+            logger::error("Vulkan function returned {}\n", err_msg);    \
             throw std::runtime_error(err_msg);                                                                         \
         }                                                                                                              \
     } while (0)

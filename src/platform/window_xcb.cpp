@@ -1,7 +1,7 @@
 #include "platform/window.hpp"
 
 #include "base/types.hpp"
-#include "base/log.hpp"
+#include "base/logger.hpp"
 #include "base/algorithms.hpp"
 
 #include <cstdio>
@@ -157,7 +157,7 @@ void Window::poll_events()
             {
                 #if 0
                 auto *configure_message = reinterpret_cast<xcb_configure_notify_event_t*>(ev);
-                log::info("Configure({}, {})\n", configure_message->width, configure_message->height);
+                logger::info("Configure({}, {})\n", configure_message->width, configure_message->height);
                 #endif
                 // push_event<event::Resize>({.width = configure_message->width, .height = configure_message->height});
                 break;
