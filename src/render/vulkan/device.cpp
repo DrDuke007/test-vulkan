@@ -95,12 +95,18 @@ Device Device::create(const Context &context, VkPhysicalDevice physical_device)
         }
     }
 
-    if (device.graphics_family_idx == u32_invalid
-        || device.compute_family_idx == u32_invalid
-        || device.transfer_family_idx == u32_invalid)
+    if (device.graphics_family_idx == u32_invalid)
     {
-        logger::error("Failed to find a graphics, compute and transfer queue.\n");
-        // throw std::runtime_error("Failed to find a graphics, compute and transfer queue.");
+        logger::error("Failed to find a graphics queue.\n");
+    }
+    if (device.compute_family_idx == u32_invalid)
+    {
+        logger::error("Failed to find a compute queue.\n");
+    }
+    if (device.transfer_family_idx == u32_invalid)
+    {
+        logger::error("Failed to find a transfer queue.\n");
+        device.transfer_family_idx = device.compute_family_idx;
     }
 
     VkDeviceCreateInfo dci      = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
