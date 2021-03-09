@@ -18,6 +18,7 @@ struct Renderer
     Handle<gfx::Framebuffer> gui_framebuffer;
 
     Handle<gfx::Image> gui_font_atlas;
+    u32 font_atlas_binding;
     Handle<gfx::Buffer> gui_font_atlas_staging;
 
     Handle<gfx::Buffer> gui_vertices;

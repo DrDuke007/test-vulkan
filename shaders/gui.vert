@@ -2,6 +2,7 @@
 #extension GL_EXT_buffer_reference : require
 
 #include "types.h"
+#include "globals.h"
 
 struct ImGuiVertex
 {
@@ -15,10 +16,11 @@ layout(buffer_reference) buffer VerticesType {
     ImGuiVertex vertices[];
 };
 
-layout(set = 0, binding = 0) uniform Options {
+layout(set = 1, binding = 0) uniform Options {
     float2 scale;
     float2 translation;
     VerticesType vertices_ptr;
+    uint texture_binding;
 };
 
 layout(location = 0) out float2 o_uv;

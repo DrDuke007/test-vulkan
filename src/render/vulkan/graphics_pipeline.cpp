@@ -178,11 +178,13 @@ void Device::destroy_framebuffer(Handle<Framebuffer> framebuffer_handle)
 
 Handle<GraphicsProgram> Device::create_program(const GraphicsState &graphics_state)
 {
-    DescriptorSet set = create_descriptor_set(*this, graphics_state);
+    DescriptorSet set = create_descriptor_set(*this, graphics_state.descriptors);
+
+    std::array sets = {global_set.vklayout, set.layout};
 
     VkPipelineLayoutCreateInfo pipeline_layout_info = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    pipeline_layout_info.setLayoutCount = 1;
-    pipeline_layout_info.pSetLayouts = &set.layout;
+    pipeline_layout_info.setLayoutCount = sets.size();
+    pipeline_layout_info.pSetLayouts    = sets.data();
 
     VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     VK_CHECK(vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout));

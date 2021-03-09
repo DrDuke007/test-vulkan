@@ -15,6 +15,7 @@ struct PACKED ImguiOptions
     float2 scale;
     float2 translation;
     u64 vertices_pointer;
+    u32 texture_binding;
 };
 
 Renderer Renderer::create(const platform::Window *window)
@@ -39,7 +40,6 @@ Renderer Renderer::create(const platform::Window *window)
     // gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
     gui_state.descriptors = {
         {.type = gfx::DescriptorType::DynamicBuffer, .count = 1},
-        {.type = gfx::DescriptorType::SampledImage,  .count = 1},
     };
 
     renderer.gui_program = device.create_program(gui_state);
@@ -112,6 +112,10 @@ Renderer Renderer::create(const platform::Window *window)
 
     renderer.fence = device.create_fence();
     renderer.transfer_done = device.create_fence(renderer.transfer_fence_value);
+
+    // global set
+    renderer.font_atlas_binding = renderer.context.device.bind_global_sampled_image(renderer.gui_font_atlas);
+    renderer.context.device.update_globals();
 
     return renderer;
 }
@@ -212,12 +216,11 @@ void Renderer::update()
     auto current_frame = frame_count % FRAME_QUEUE_LENGTH;
     auto &work_pool = work_pools[current_frame];
 
-    // Update UI
     auto &io = ImGui::GetIO();
     io.DisplaySize.x = context.surface->extent.width;
     io.DisplaySize.y = context.surface->extent.height;
 
-    // Transfer stuff
+    // -- Upload ImGui's vertices and indices
     ImDrawData *data = ImGui::GetDrawData();
     assert(sizeof(ImDrawVert) * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
     assert(sizeof(ImDrawIdx)  * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
@@ -243,11 +246,15 @@ void Renderer::update()
         indices  += cmd_list.IdxBuffer.Size;
     }
 
+    // -- Update shader data
     auto *options = device.map_buffer<ImguiOptions>(gui_options);
     options->scale = float2(2.0f / data->DisplaySize.x, 2.0f / data->DisplaySize.y);
     options->translation = float2(-1.0f - data->DisplayPos.x * options->scale.x, -1.0f - data->DisplayPos.y * options->scale.y);
     options->vertices_pointer = device.get_buffer_address(gui_vertices);
+    options->texture_binding = font_atlas_binding;
 
+
+    // -- Upload the font atlas during the first frame
     if (frame_count == 0)
     {
         gfx::TransferWork transfer_cmd = device.get_transfer_work(work_pool);
@@ -259,6 +266,7 @@ void Renderer::update()
     }
 
     gfx::GraphicsWork cmd = device.get_graphics_work(work_pool);
+    cmd.begin();
 
     // vulkan hack: this command buffer will wait for the image acquire semaphore
     cmd.wait_for_acquired(*context.surface, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
@@ -270,22 +278,16 @@ void Renderer::update()
     }
 
     auto swapchain_image = context.surface->images[context.surface->current_image];
-
-    cmd.begin();
-
     cmd.barrier(swapchain_image, gfx::ImageUsage::ColorAttachment);
     cmd.barrier(gui_font_atlas, gfx::ImageUsage::GraphicsShaderRead);
-
     cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
 
     cmd.bind_uniform_buffer(gui_program, 0, gui_options, 0, sizeof(ImguiOptions));
-    cmd.bind_image(gui_program, 1, gui_font_atlas);
     cmd.bind_pipeline(gui_program, 0);
     cmd.bind_index_buffer(gui_indices);
 
-
-    ImVec2 clip_off   = data->DisplayPos;       // (0,0) unless using multi-viewports
-    ImVec2 clip_scale = data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
+    float2 clip_off   = data->DisplayPos;       // (0,0) unless using multi-viewports
+    float2 clip_scale = data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
 
     VkViewport viewport{};
     viewport.width    = data->DisplaySize.x * data->FramebufferScale.x;
@@ -312,12 +314,11 @@ void Renderer::update()
             clip_rect.w = (draw_command.ClipRect.w - clip_off.y) * clip_scale.y;
 
             // Apply scissor/clipping rectangle
-            // FIXME: We could clamp width/height based on clamped min/max values.
             VkRect2D scissor;
             scissor.offset.x      = (static_cast<i32>(clip_rect.x) > 0) ? static_cast<i32>(clip_rect.x) : 0;
             scissor.offset.y      = (static_cast<i32>(clip_rect.y) > 0) ? static_cast<i32>(clip_rect.y) : 0;
             scissor.extent.width  = static_cast<u32>(clip_rect.z - clip_rect.x);
-            scissor.extent.height = static_cast<u32>(clip_rect.w - clip_rect.y + 1); // FIXME: Why +1 here?
+            scissor.extent.height = static_cast<u32>(clip_rect.w - clip_rect.y);
 
             cmd.set_scissor(scissor);
 
@@ -330,7 +331,6 @@ void Renderer::update()
 
     cmd.end_pass();
     cmd.barrier(swapchain_image, gfx::ImageUsage::Present);
-
     cmd.end();
 
     if (end_frame(cmd))

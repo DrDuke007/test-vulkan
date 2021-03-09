@@ -41,6 +41,24 @@ enum BuiltinSampler
     Count
 };
 
+struct GlobalDescriptorSet
+{
+    VkDescriptorSet vkset;
+    VkDescriptorSetLayout vklayout;
+    VkDescriptorPool vkpool;
+    VkPipelineLayout vkpipelinelayout;
+
+    Handle<Buffer> dynamic_buffer;
+    u32 dynamic_offset = 0;
+
+    Vec<Handle<Image>> storage_images;
+    Vec<Handle<Image>> sampled_images;
+
+    Vec<Handle<Image>> pending_images;
+    Vec<u32> pending_indices;
+    Vec<u32> pending_binding;
+};
+
 struct Device
 {
     VkDevice device = VK_NULL_HANDLE;
@@ -54,7 +72,7 @@ struct Device
     VmaAllocator allocator;
 
     VkDescriptorPool descriptor_pool;
-    DescriptorSet global_set;
+    GlobalDescriptorSet global_set;
 
     Pool<Shader> shaders;
     Pool<GraphicsProgram> graphics_programs;
@@ -110,6 +128,11 @@ struct Device
     void flush_buffer(Handle<Buffer> buffer_handle);
 
     void destroy_buffer(Handle<Buffer> buffer_handle);
+
+    // Global descriptor set
+    u32 bind_global_storage_image(Handle<Image> image_handle);
+    u32 bind_global_sampled_image(Handle<Image> image_handle);
+    void update_globals();
 
     // Programs
     unsigned compile(Handle<GraphicsProgram> &program_handle, const RenderState &render_state);

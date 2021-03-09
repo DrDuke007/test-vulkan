@@ -17,6 +17,16 @@ void Work::begin()
     VkCommandBufferBeginInfo binfo = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     binfo.flags                    = 0;
     vkBeginCommandBuffer(command_buffer, &binfo);
+
+
+    if (queue_type == QueueType::Graphics)
+    {
+        vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, device->global_set.vkpipelinelayout, 0, 1, &device->global_set.vkset, 1, &device->global_set.dynamic_offset);
+    }
+    else if (queue_type == QueueType::Compute)
+    {
+        vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, device->global_set.vkpipelinelayout, 0, 1, &device->global_set.vkset, 1, &device->global_set.dynamic_offset);
+    }
 }
 
 void Work::end()
@@ -166,6 +176,7 @@ void ComputeWork::bind_image(Handle<GraphicsProgram> program_handle, uint slot, 
     ::vulkan::bind_image(program.descriptor_set, slot, image_handle);
 }
 
+
 /// --- GraphicsWork
 
 
@@ -221,15 +232,13 @@ void GraphicsWork::bind_pipeline(Handle<GraphicsProgram> program_handle, uint pi
     auto &program = *device->graphics_programs.get(program_handle);
     auto pipeline = program.pipelines[pipeline_index];
 
-    std::array sets {
-        find_or_create_descriptor_set(*device, program.descriptor_set)
-    };
+    VkDescriptorSet set = find_or_create_descriptor_set(*device, program.descriptor_set);
 
     Vec<u32> offsets;
     offsets.reserve(program.descriptor_set.dynamic_offsets.size());
     offsets.insert(offsets.end(), program.descriptor_set.dynamic_offsets.begin(), program.descriptor_set.dynamic_offsets.end());
 
-    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program.pipeline_layout, 0, sets.size(), sets.data(), offsets.size(), offsets.data());
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program.pipeline_layout, 1, 1, &set, offsets.size(), offsets.data());
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
 

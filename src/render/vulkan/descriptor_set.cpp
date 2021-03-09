@@ -9,16 +9,16 @@
 
 namespace vulkan
 {
-DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphics_state)
+DescriptorSet create_descriptor_set(Device &device, const Vec<DescriptorType> &descriptors)
 {
     DescriptorSet descriptor_set = {};
 
     Vec<VkDescriptorSetLayoutBinding> bindings;
 
     uint binding_number = 0;
-    for (usize i_descriptor = 0; i_descriptor < graphics_state.descriptors.size(); i_descriptor++)
+    for (usize i_descriptor = 0; i_descriptor < descriptors.size(); i_descriptor++)
     {
-        auto &descriptor_type = graphics_state.descriptors[i_descriptor];
+        auto &descriptor_type = descriptors[i_descriptor];
 
         bindings.emplace_back();
         auto &binding = bindings.back();
@@ -37,7 +37,7 @@ DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphic
     descriptor_set.dynamic_offsets.resize(descriptor_set.dynamic_descriptors.size());
 
     Descriptor empty = {{{}}};
-    descriptor_set.descriptors.resize(graphics_state.descriptors.size(), empty);
+    descriptor_set.descriptors.resize(descriptors.size(), empty);
 
     VkDescriptorSetLayoutCreateInfo desc_layout_info = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     desc_layout_info.bindingCount = bindings.size();
@@ -45,7 +45,7 @@ DescriptorSet create_descriptor_set(Device &device, const GraphicsState &graphic
 
     VK_CHECK(vkCreateDescriptorSetLayout(device.device, &desc_layout_info, nullptr, &descriptor_set.layout));
 
-    descriptor_set.descriptor_desc = graphics_state.descriptors;
+    descriptor_set.descriptor_desc = descriptors;
 
     return descriptor_set;
 }
@@ -61,6 +61,7 @@ void bind_image(DescriptorSet &set, u32 slot, Handle<Image> image_handle)
            || set.descriptor_desc[slot].type == DescriptorType::StorageImage);
     set.descriptors[slot].image = {image_handle};
 }
+
 
 void bind_uniform_buffer(DescriptorSet &set, u32 slot, Handle<Buffer> buffer_handle, usize offset, usize size)
 {
