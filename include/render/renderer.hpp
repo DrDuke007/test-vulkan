@@ -37,6 +37,7 @@ struct Renderer
     void destroy();
 
     void on_resize();
+    bool start_frame();
+    bool end_frame(gfx::ComputeWork &cmd);
     void update();
-
 };

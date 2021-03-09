@@ -2,6 +2,7 @@
 #include "render/vulkan/descriptor_set.hpp"
 #include "render/vulkan/device.hpp"
 
+#include "render/vulkan/queues.hpp"
 #include "render/vulkan/surface.hpp"
 #include "render/vulkan/utils.hpp"
 #include "vulkan/vulkan_core.h"
@@ -280,9 +281,9 @@ void Device::destroy_work_pool(WorkPool &work_pool)
 }
 
 // Work
-static Work create_work(Device &device, WorkPool &work_pool, WorkPool::POOL_TYPE pool_type)
+static Work create_work(Device &device, WorkPool &work_pool, QueueType queue_type)
 {
-    auto &command_pool = work_pool.command_pools[pool_type];
+    auto &command_pool = work_pool.command_pools[to_underlying(queue_type)];
 
     Work work = {};
     work.device = &device;
@@ -294,13 +295,15 @@ static Work create_work(Device &device, WorkPool &work_pool, WorkPool::POOL_TYPE
     VK_CHECK(vkAllocateCommandBuffers(device.device, &ai, &work.command_buffer));
 
     u32 queue_family_idx =
-          pool_type == WorkPool::POOL_TYPE_GRAPHICS ? device.graphics_family_idx
-        : pool_type == WorkPool::POOL_TYPE_COMPUTE  ? device.compute_family_idx
-        : pool_type == WorkPool::POOL_TYPE_TRANSFER ? device.transfer_family_idx
+        queue_type == QueueType::Graphics ? device.graphics_family_idx
+        : queue_type == QueueType::Compute  ? device.compute_family_idx
+        : queue_type == QueueType::Transfer ? device.transfer_family_idx
         : u32_invalid;
 
     assert(queue_family_idx != u32_invalid);
     vkGetDeviceQueue(device.device, queue_family_idx, 0, &work.queue);
+
+    work.queue_type = queue_type;
 
     command_pool.free_list.push_back(work.command_buffer);
 
@@ -309,17 +312,17 @@ static Work create_work(Device &device, WorkPool &work_pool, WorkPool::POOL_TYPE
 
 GraphicsWork Device::get_graphics_work(WorkPool &work_pool)
 {
-    return {{{{create_work(*this, work_pool, WorkPool::POOL_TYPE_GRAPHICS)}}}};
+    return {{{{create_work(*this, work_pool, QueueType::Graphics)}}}};
 }
 
 ComputeWork Device::get_compute_work(WorkPool &work_pool)
 {
-    return {{{create_work(*this, work_pool, WorkPool::POOL_TYPE_COMPUTE)}}};
+    return {{{create_work(*this, work_pool, QueueType::Compute)}}};
 }
 
 TransferWork Device::get_transfer_work(WorkPool &work_pool)
 {
-    return {{create_work(*this, work_pool, WorkPool::POOL_TYPE_TRANSFER)}};
+    return {{create_work(*this, work_pool, QueueType::Transfer)}};
 }
 
 // Fences
@@ -404,16 +407,8 @@ void Device::submit(Work &work, const Vec<Fence> &signal_fences, const Vec<u64> 
     VK_CHECK(vkQueueSubmit(work.queue, 1, &submit_info, VK_NULL_HANDLE));
 }
 
-bool Device::present(Surface &surface, WorkPool::POOL_TYPE pool_type)
+bool Device::present(Surface &surface, Work &work)
 {
-    u32 queue_family_idx =
-          pool_type == WorkPool::POOL_TYPE_GRAPHICS ? this->graphics_family_idx
-        : pool_type == WorkPool::POOL_TYPE_COMPUTE  ? this->compute_family_idx
-        : pool_type == WorkPool::POOL_TYPE_TRANSFER ? this->transfer_family_idx
-        : u32_invalid;
-
-    assert(queue_family_idx != u32_invalid);
-
     VkPresentInfoKHR present_i   = {.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present_i.waitSemaphoreCount = 1;
     present_i.pWaitSemaphores    = &surface.can_present_semaphores[surface.current_image];
@@ -421,10 +416,7 @@ bool Device::present(Surface &surface, WorkPool::POOL_TYPE pool_type)
     present_i.pSwapchains        = &surface.swapchain;
     present_i.pImageIndices      = &surface.current_image;
 
-    VkQueue queue = VK_NULL_HANDLE;
-    vkGetDeviceQueue(this->device, queue_family_idx, 0, &queue);
-
-    auto res = vkQueuePresentKHR(queue, &present_i);
+    auto res = vkQueuePresentKHR(work.queue, &present_i);
 
     if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
     {

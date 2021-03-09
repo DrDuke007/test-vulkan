@@ -1,9 +1,11 @@
 #pragma once
+#include "base/algorithms.hpp"
 #include "base/types.hpp"
 #include "base/option.hpp"
 #include "base/vector.hpp"
 #include "base/pool.hpp"
 #include "render/vulkan/commands.hpp"
+#include "render/vulkan/queues.hpp"
 #include "render/vulkan/resources.hpp"
 #include "render/vulkan/descriptor_set.hpp"
 
@@ -26,18 +28,11 @@ struct CommandPool
 
 struct WorkPool
 {
-    enum POOL_TYPE
-    {
-        POOL_TYPE_GRAPHICS = 0,
-        POOL_TYPE_COMPUTE  = 1,
-        POOL_TYPE_TRANSFER = 2
-    };
-
     std::array<CommandPool, 3> command_pools;
 
-    CommandPool &graphics() { return command_pools[POOL_TYPE_GRAPHICS]; }
-    CommandPool &compute()  { return command_pools[POOL_TYPE_COMPUTE];  }
-    CommandPool &transfer() { return command_pools[POOL_TYPE_TRANSFER]; }
+    inline CommandPool &graphics() { return command_pools[to_underlying(QueueType::Graphics)]; }
+    inline CommandPool &compute()  { return command_pools[to_underlying(QueueType::Compute)];  }
+    inline CommandPool &transfer() { return command_pools[to_underlying(QueueType::Transfer)]; }
 };
 
 enum BuiltinSampler
@@ -130,7 +125,7 @@ struct Device
 
     // Swapchain
     bool acquire_next_swapchain(Surface &surface);
-    bool present(Surface &surface, WorkPool::POOL_TYPE pool_type);
+    bool present(Surface &surface, Work &work);
 };
 
 }

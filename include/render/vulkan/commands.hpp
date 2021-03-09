@@ -41,6 +41,7 @@ struct Work
     Vec<u64> wait_value_list;
     Vec<VkPipelineStageFlags> wait_stage_list;
     VkQueue queue;
+    QueueType queue_type;
 
     // vulkan hacks:
     Option<VkSemaphore> image_acquired_semaphore;

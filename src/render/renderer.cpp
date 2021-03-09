@@ -155,14 +155,10 @@ void Renderer::on_resize()
 
 }
 
-void Renderer::update()
+bool Renderer::start_frame()
 {
     gfx::Device &device = context.device;
     auto current_frame = frame_count % FRAME_QUEUE_LENGTH;
-
-    auto &io = ImGui::GetIO();
-    io.DisplaySize.x = context.surface->extent.width;
-    io.DisplaySize.y = context.surface->extent.height;
 
     // wait for fence, blocking: dont wait for the first QUEUE_LENGTH frames
     u64 wait_value = frame_count < FRAME_QUEUE_LENGTH ? 0 : frame_count-FRAME_QUEUE_LENGTH+1;
@@ -174,8 +170,54 @@ void Renderer::update()
 
     ImGui::Render();
 
-    // Transfer stuff
+    // receipt contains the image acquired semaphore
+    bool out_of_date_swapchain = device.acquire_next_swapchain(*context.surface);
+    if (out_of_date_swapchain)
+    {
+        return true;
+    }
 
+    return false;
+}
+
+bool Renderer::end_frame(gfx::ComputeWork &cmd)
+{
+    gfx::Device &device = context.device;
+
+    // vulkan hack: hint the device to submit a semaphore to wait on before presenting
+    cmd.prepare_present(*context.surface);
+
+    device.submit(cmd, {fence}, {frame_count+1});
+
+    // present will wait for semaphore
+    bool out_of_date_swapchain = device.present(*context.surface, cmd);
+    if (out_of_date_swapchain)
+    {
+        return true;
+    }
+
+    frame_count += 1;
+    return false;
+}
+
+void Renderer::update()
+{
+    if (start_frame())
+    {
+        on_resize();
+        return;
+    }
+
+    gfx::Device &device = context.device;
+    auto current_frame = frame_count % FRAME_QUEUE_LENGTH;
+    auto &work_pool = work_pools[current_frame];
+
+    // Update UI
+    auto &io = ImGui::GetIO();
+    io.DisplaySize.x = context.surface->extent.width;
+    io.DisplaySize.y = context.surface->extent.height;
+
+    // Transfer stuff
     ImDrawData *data = ImGui::GetDrawData();
     assert(sizeof(ImDrawVert) * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
     assert(sizeof(ImDrawIdx)  * static_cast<u32>(data->TotalVtxCount) < 1_MiB);
@@ -216,14 +258,6 @@ void Renderer::update()
         device.submit(transfer_cmd, {transfer_done}, {transfer_fence_value+1});
     }
 
-    // receipt contains the image acquired semaphore
-    bool out_of_date_swapchain = device.acquire_next_swapchain(*context.surface);
-    if (out_of_date_swapchain)
-    {
-        on_resize();
-        return;
-    }
-
     gfx::GraphicsWork cmd = device.get_graphics_work(work_pool);
 
     // vulkan hack: this command buffer will wait for the image acquire semaphore
@@ -235,85 +269,73 @@ void Renderer::update()
         transfer_fence_value += 1;
     }
 
-    // do random stuff
+    auto swapchain_image = context.surface->images[context.surface->current_image];
+
+    cmd.begin();
+
+    cmd.barrier(swapchain_image, gfx::ImageUsage::ColorAttachment);
+    cmd.barrier(gui_font_atlas, gfx::ImageUsage::GraphicsShaderRead);
+
+    cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
+
+    cmd.bind_uniform_buffer(gui_program, 0, gui_options, 0, sizeof(ImguiOptions));
+    cmd.bind_image(gui_program, 1, gui_font_atlas);
+    cmd.bind_pipeline(gui_program, 0);
+    cmd.bind_index_buffer(gui_indices);
+
+
+    ImVec2 clip_off   = data->DisplayPos;       // (0,0) unless using multi-viewports
+    ImVec2 clip_scale = data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
+
+    VkViewport viewport{};
+    viewport.width    = data->DisplaySize.x * data->FramebufferScale.x;
+    viewport.height   = data->DisplaySize.y * data->FramebufferScale.y;
+    viewport.minDepth = 1.0f;
+    viewport.maxDepth = 1.0f;
+    cmd.set_viewport(viewport);
+
+    i32 vertex_offset = 0;
+    u32 index_offset  = 0;
+    for (int list = 0; list < data->CmdListsCount; list++)
     {
-        auto swapchain_image = context.surface->images[context.surface->current_image];
+        const auto &cmd_list = *data->CmdLists[list];
 
-        cmd.begin();
-
-        cmd.barrier(swapchain_image, gfx::ImageUsage::ColorAttachment);
-        cmd.barrier(gui_font_atlas, gfx::ImageUsage::GraphicsShaderRead);
-
-        cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
-
-        cmd.bind_uniform_buffer(gui_program, 0, gui_options, 0, sizeof(ImguiOptions));
-        cmd.bind_image(gui_program, 1, gui_font_atlas);
-        cmd.bind_pipeline(gui_program, 0);
-        cmd.bind_index_buffer(gui_indices);
-
-
-        ImVec2 clip_off   = data->DisplayPos;       // (0,0) unless using multi-viewports
-        ImVec2 clip_scale = data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
-
-        VkViewport viewport{};
-        viewport.width    = data->DisplaySize.x * data->FramebufferScale.x;
-        viewport.height   = data->DisplaySize.y * data->FramebufferScale.y;
-        viewport.minDepth = 1.0f;
-        viewport.maxDepth = 1.0f;
-        cmd.set_viewport(viewport);
-
-        i32 vertex_offset = 0;
-        u32 index_offset  = 0;
-        for (int list = 0; list < data->CmdListsCount; list++)
+        for (int command_index = 0; command_index < cmd_list.CmdBuffer.Size; command_index++)
         {
-            const auto &cmd_list = *data->CmdLists[list];
+            const auto &draw_command = cmd_list.CmdBuffer[command_index];
 
-            for (int command_index = 0; command_index < cmd_list.CmdBuffer.Size; command_index++)
-            {
-                const auto &draw_command = cmd_list.CmdBuffer[command_index];
+            // Project scissor/clipping rectangles into framebuffer space
+            ImVec4 clip_rect;
+            clip_rect.x = (draw_command.ClipRect.x - clip_off.x) * clip_scale.x;
+            clip_rect.y = (draw_command.ClipRect.y - clip_off.y) * clip_scale.y;
+            clip_rect.z = (draw_command.ClipRect.z - clip_off.x) * clip_scale.x;
+            clip_rect.w = (draw_command.ClipRect.w - clip_off.y) * clip_scale.y;
 
-                // Project scissor/clipping rectangles into framebuffer space
-                ImVec4 clip_rect;
-                clip_rect.x = (draw_command.ClipRect.x - clip_off.x) * clip_scale.x;
-                clip_rect.y = (draw_command.ClipRect.y - clip_off.y) * clip_scale.y;
-                clip_rect.z = (draw_command.ClipRect.z - clip_off.x) * clip_scale.x;
-                clip_rect.w = (draw_command.ClipRect.w - clip_off.y) * clip_scale.y;
+            // Apply scissor/clipping rectangle
+            // FIXME: We could clamp width/height based on clamped min/max values.
+            VkRect2D scissor;
+            scissor.offset.x      = (static_cast<i32>(clip_rect.x) > 0) ? static_cast<i32>(clip_rect.x) : 0;
+            scissor.offset.y      = (static_cast<i32>(clip_rect.y) > 0) ? static_cast<i32>(clip_rect.y) : 0;
+            scissor.extent.width  = static_cast<u32>(clip_rect.z - clip_rect.x);
+            scissor.extent.height = static_cast<u32>(clip_rect.w - clip_rect.y + 1); // FIXME: Why +1 here?
 
-                // Apply scissor/clipping rectangle
-                // FIXME: We could clamp width/height based on clamped min/max values.
-                VkRect2D scissor;
-                scissor.offset.x      = (static_cast<i32>(clip_rect.x) > 0) ? static_cast<i32>(clip_rect.x) : 0;
-                scissor.offset.y      = (static_cast<i32>(clip_rect.y) > 0) ? static_cast<i32>(clip_rect.y) : 0;
-                scissor.extent.width  = static_cast<u32>(clip_rect.z - clip_rect.x);
-                scissor.extent.height = static_cast<u32>(clip_rect.w - clip_rect.y + 1); // FIXME: Why +1 here?
+            cmd.set_scissor(scissor);
 
-                cmd.set_scissor(scissor);
+            cmd.draw_indexed({.vertex_count = draw_command.ElemCount, .index_offset = index_offset, .vertex_offset = vertex_offset});
 
-                cmd.draw_indexed({.vertex_count = draw_command.ElemCount, .index_offset = index_offset, .vertex_offset = vertex_offset});
-
-                index_offset += draw_command.ElemCount;
-            }
-            vertex_offset += cmd_list.VtxBuffer.Size;
+            index_offset += draw_command.ElemCount;
         }
-
-        cmd.end_pass();
-        cmd.barrier(swapchain_image, gfx::ImageUsage::Present);
-
-        cmd.end();
+        vertex_offset += cmd_list.VtxBuffer.Size;
     }
 
-    // vulkan hack: hint the device to submit a semaphore to wait on before presenting
-    cmd.prepare_present(*context.surface);
+    cmd.end_pass();
+    cmd.barrier(swapchain_image, gfx::ImageUsage::Present);
 
-    device.submit(cmd, {fence}, {frame_count+1});
+    cmd.end();
 
-    // present will wait for semaphore
-    out_of_date_swapchain = device.present(*context.surface, gfx::WorkPool::POOL_TYPE_GRAPHICS);
-    if (out_of_date_swapchain)
+    if (end_frame(cmd))
     {
         on_resize();
         return;
     }
-
-    frame_count += 1;
 }
