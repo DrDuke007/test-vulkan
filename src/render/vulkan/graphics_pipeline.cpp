@@ -95,6 +95,33 @@ Handle<RenderPass> Device::find_or_create_renderpass(const RenderAttachments &re
     return this->create_renderpass(render_attachments);
 }
 
+Handle<RenderPass> Device::find_or_create_renderpass(Handle<Framebuffer> framebuffer_handle)
+{
+    auto &framebuffer = *this->framebuffers.get(framebuffer_handle);
+
+    RenderAttachments render_attachments;
+
+    for (u32 i_image = 0; i_image < framebuffer.desc.attachments_format.size(); i_image++)
+    {
+        render_attachments.colors.push_back({.format = framebuffer.desc.attachments_format[i_image]});
+    }
+
+    if (framebuffer.desc.depth_format)
+    {
+        render_attachments.depth = {.format = framebuffer.desc.depth_format.value()};
+    }
+
+    for (auto &[handle, renderpass] : renderpasses)
+    {
+        if (renderpass->attachments == render_attachments)
+        {
+            return handle;
+        }
+    }
+
+    return this->create_renderpass(render_attachments);
+}
+
 void Device::destroy_renderpass(Handle<RenderPass> renderpass_handle)
 {
     if (auto *renderpass = renderpasses.get(renderpass_handle))
@@ -109,24 +136,40 @@ void Device::destroy_renderpass(Handle<RenderPass> renderpass_handle)
 Handle<Framebuffer> Device::create_framebuffer(const FramebufferDescription &desc)
 {
     // Imageless framebuffer
-
     RenderAttachments render_attachments;
-    Vec<VkFramebufferAttachmentImageInfo> image_infos(desc.attachments.size());
+    Vec<VkFramebufferAttachmentImageInfo> image_infos;
+    image_infos.reserve(desc.attachments_format.size() + 1);
 
-    for (u32 i_image = 0; i_image < desc.attachments.size(); i_image++)
+    for (u32 i_image = 0; i_image < desc.attachments_format.size(); i_image++)
     {
-        VkFormat image_format = desc.attachments[i_image].format;
+        image_infos.emplace_back();
+        auto &image_info = image_infos.back();
+        image_info = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO};
+        image_info.flags = 0;
+        image_info.usage = color_attachment_usage;
+        image_info.width = desc.width;
+        image_info.height = desc.height;
+        image_info.layerCount = desc.layer_count;
+        image_info.viewFormatCount = 1;
+        image_info.pViewFormats = &desc.attachments_format[i_image];
 
-        image_infos[i_image] = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO};
-        image_infos[i_image].flags = 0;
-        image_infos[i_image].usage = color_attachment_usage;
-        image_infos[i_image].width = desc.attachments[i_image].width;
-        image_infos[i_image].height = desc.attachments[i_image].height;
-        image_infos[i_image].layerCount = desc.attachments[i_image].layer_count;
-        image_infos[i_image].viewFormatCount = 1;
-        image_infos[i_image].pViewFormats = &desc.attachments[i_image].format;
+        render_attachments.colors.push_back({.format = desc.attachments_format[i_image]});
+    }
 
-        render_attachments.colors.push_back({.format = image_format});
+    if (desc.depth_format)
+    {
+        image_infos.emplace_back();
+        auto &image_info = image_infos.back();
+        image_info = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO};
+        image_info.flags = 0;
+        image_info.usage = depth_attachment_usage;
+        image_info.width = desc.width;
+        image_info.height = desc.height;
+        image_info.layerCount = desc.layer_count;
+        image_info.viewFormatCount = 1;
+        image_info.pViewFormats = &desc.depth_format.value();
+
+        render_attachments.depth = {.format = desc.depth_format.value()};
     }
 
     VkFramebufferAttachmentsCreateInfo attachments_info = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO};
@@ -225,6 +268,8 @@ unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderSt
     assert(p_program);
     auto &program = *p_program;
 
+    const auto &renderpass = *this->renderpasses.get(this->find_or_create_renderpass(program.graphics_state.framebuffer));
+
     Vec<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
 
     VkPipelineDynamicStateCreateInfo dyn_i = {.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
@@ -266,9 +311,9 @@ unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderSt
 
     // TODO: from render_pass
     Vec<VkPipelineColorBlendAttachmentState> att_states;
-    att_states.reserve(program.graphics_state.attachments.colors.size());
+    att_states.reserve(renderpass.attachments.colors.size());
 
-    for (const auto &color_attachment : program.graphics_state.attachments.colors)
+    for (const auto &color_attachment : renderpass.attachments.colors)
     {
         UNUSED(color_attachment);
 
@@ -333,7 +378,7 @@ unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderSt
     VkPipelineMultisampleStateCreateInfo ms_i = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
     ms_i.flags                                = 0;
     ms_i.pSampleMask                          = nullptr;
-    ms_i.rasterizationSamples                 = program.graphics_state.attachments.colors.empty() ? VK_SAMPLE_COUNT_1_BIT : program.graphics_state.attachments.colors[0].samples;
+    ms_i.rasterizationSamples                 = renderpass.attachments.colors.empty() ? VK_SAMPLE_COUNT_1_BIT : renderpass.attachments.colors[0].samples;
     ms_i.sampleShadingEnable                  = VK_FALSE;
     ms_i.alphaToCoverageEnable                = VK_FALSE;
     ms_i.alphaToOneEnable                     = VK_FALSE;
@@ -361,9 +406,6 @@ unsigned Device::compile(Handle<GraphicsProgram> &program_handle, const RenderSt
         create_info.pName  = "main";
         shader_stages.push_back(create_info);
     }
-
-    Handle<RenderPass> renderpass_handle = this->find_or_create_renderpass(program.graphics_state.attachments);
-    const auto &renderpass = *this->renderpasses.get(renderpass_handle);
 
     VkGraphicsPipelineCreateInfo pipe_i = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
     pipe_i.layout                       = program.pipeline_layout;

@@ -110,6 +110,7 @@ struct Device
 
     Handle<RenderPass> create_renderpass(const RenderAttachments &render_attachments);
     Handle<RenderPass> find_or_create_renderpass(const RenderAttachments &render_attachments);
+    Handle<RenderPass> find_or_create_renderpass(Handle<Framebuffer> framebuffer_handle);
     void destroy_renderpass(Handle<RenderPass> renderpass_handle);
 
     Handle<Framebuffer> create_framebuffer(const FramebufferDescription &desc);

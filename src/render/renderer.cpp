@@ -25,19 +25,27 @@ Renderer Renderer::create(const platform::Window *window)
     };
 
     auto &device = renderer.context.device;
+    auto &surface = *renderer.context.surface;
 
     for (auto &work_pool : renderer.work_pools)
     {
         device.create_work_pool(work_pool);
     }
 
-    auto &surface = *renderer.context.surface;
+    // Create framebuffer
+    renderer.swapchain_clear_renderpass = device.find_or_create_renderpass({.colors = {{.format = surface.format.format}}});
+
+    renderer.swapchain_framebuffer = device.create_framebuffer({
+            .width = surface.extent.width,
+            .height = surface.extent.height,
+            .attachments_format = {surface.format.format},
+        });
+
 
     gfx::GraphicsState gui_state = {};
     gui_state.vertex_shader   =  device.create_shader("shaders/gui.vert.spv");
     gui_state.fragment_shader =  device.create_shader("shaders/gui.frag.spv");
-    gui_state.attachments.colors.push_back({.format = surface.format.format});
-    // gui_state.attachments.depth = {.format = VK_FORMAT_D32_SFLOAT};
+    gui_state.framebuffer = renderer.swapchain_framebuffer;
     gui_state.descriptors = {
         {.type = gfx::DescriptorType::DynamicBuffer, .count = 1},
     };
@@ -76,18 +84,6 @@ Renderer Renderer::create(const platform::Window *window)
         p_font_atlas[i] = pixels[i];
     }
     device.flush_buffer(renderer.gui_font_atlas_staging);
-
-    renderer.gui_renderpass = device.find_or_create_renderpass(gui_state.attachments);
-
-    Vec<gfx::FramebufferAttachment> fb_attachments = {
-        {.width = surface.extent.width, .height = surface.extent.height, .format = surface.format.format}
-    };
-
-    renderer.gui_framebuffer = device.create_framebuffer({
-            .width = surface.extent.width,
-            .height = surface.extent.height,
-            .attachments = fb_attachments,
-        });
 
     renderer.gui_vertices = device.create_buffer({
             .name = "Imgui vertices",
@@ -146,17 +142,12 @@ void Renderer::on_resize()
     surface.destroy_swapchain(device);
     surface.create_swapchain(device);
 
-    Vec<gfx::FramebufferAttachment> fb_attachments = {
-        {.width = surface.extent.width, .height = surface.extent.height, .format = surface.format.format}
-    };
-
-    device.destroy_framebuffer(gui_framebuffer);
-    gui_framebuffer = device.create_framebuffer({
+    device.destroy_framebuffer(swapchain_framebuffer);
+    swapchain_framebuffer = device.create_framebuffer({
             .width = surface.extent.width,
             .height = surface.extent.height,
-            .attachments = fb_attachments,
+            .attachments_format = {surface.format.format},
         });
-
 }
 
 bool Renderer::start_frame()
@@ -280,7 +271,7 @@ void Renderer::update()
     auto swapchain_image = context.surface->images[context.surface->current_image];
     cmd.barrier(swapchain_image, gfx::ImageUsage::ColorAttachment);
     cmd.barrier(gui_font_atlas, gfx::ImageUsage::GraphicsShaderRead);
-    cmd.begin_pass(gui_renderpass, gui_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
+    cmd.begin_pass(swapchain_clear_renderpass, swapchain_framebuffer, {swapchain_image}, {{{.float32 = {0.0f, 0.0f, 0.0f, 1.0f}}}});
 
     cmd.bind_uniform_buffer(gui_program, 0, gui_options, 0, sizeof(ImguiOptions));
     cmd.bind_pipeline(gui_program, 0);

@@ -167,21 +167,13 @@ struct RenderState
     bool operator==(const RenderState &) const = default;
 };
 
-struct FramebufferAttachment
-{
-    u32 width = 0;
-    u32 height = 0;
-    u32 layer_count = 1;
-    VkFormat format = VK_FORMAT_UNDEFINED;
-    bool operator==(const FramebufferAttachment &) const = default;
-};
-
 struct FramebufferDescription
 {
     u32 width = 0;
     u32 height = 0;
     u32 layer_count = 1;
-    Vec<FramebufferAttachment> attachments;
+    Vec<VkFormat> attachments_format;
+    Option<VkFormat> depth_format;
     bool operator==(const FramebufferDescription &) const = default;
 };
 
@@ -219,7 +211,7 @@ struct GraphicsState
 {
     Handle<Shader> vertex_shader;
     Handle<Shader> fragment_shader;
-    RenderAttachments attachments;
+    Handle<Framebuffer> framebuffer;
     Vec<DescriptorType> descriptors;
 };
 

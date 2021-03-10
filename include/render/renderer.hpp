@@ -12,10 +12,11 @@ struct Renderer
 
     uint frame_count;
 
+    Handle<gfx::RenderPass> swapchain_clear_renderpass;
+    Handle<gfx::Framebuffer> swapchain_framebuffer;
+
     // ImGuiPass
     Handle<gfx::GraphicsProgram> gui_program;
-    Handle<gfx::RenderPass> gui_renderpass;
-    Handle<gfx::Framebuffer> gui_framebuffer;
 
     Handle<gfx::Image> gui_font_atlas;
     u32 font_atlas_binding;
